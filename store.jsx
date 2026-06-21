@@ -3,6 +3,12 @@
 const THIS_YEAR = 2026;
 const LS_KEY = "cellar_wines_v2";
 
+// ---------- backup ----------
+const AUTO_BACKUP_LS = "cellar_auto_bk";
+let _autoBackup = (()=>{ try{ return localStorage.getItem(AUTO_BACKUP_LS)!=="false"; }catch(e){ return true; } })();
+let _bkTimer = null;
+function _dl(blob,name){ const url=URL.createObjectURL(blob); const a=Object.assign(document.createElement("a"),{href:url,download:name}); document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url),2000); }
+
 // ---------- persistence ----------
 let _wines = null;
 const listeners = new Set();
@@ -25,7 +31,7 @@ function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(_wines)); }
 const Cellar = {
   all(){ return load(); },
   get(id){ return load().find(w=>w.id===id); },
-  add(w){ const item = { id:uid(), addedAt:Date.now(), qty:1, photo:null, ...w }; _wines=[item, ...load()]; persist(); return item; },
+  add(w){ const item = { id:uid(), addedAt:Date.now(), qty:1, photo:null, ...w }; _wines=[item, ...load()]; persist(); Cellar.scheduleAutoBackup(); return item; },
   // Find an existing wine that matches producer+cuvée+vintage+color (case-insensitive)
   findDuplicate(w){
     const norm = s => (s||"").trim().toLowerCase();
@@ -52,6 +58,33 @@ const Cellar = {
   reseal(id){ Cellar.update(id, { coravin:null }); },
   finishBottle(id){ const w=Cellar.get(id); if(!w) return; const qty=(w.qty||1)-1; if(qty<=0){ Cellar.remove(id); } else { Cellar.update(id, { qty, coravin:null }); } },
   subscribe(fn){ listeners.add(fn); return ()=>listeners.delete(fn); },
+  exportBackup(){
+    const date=new Date().toISOString().slice(0,10);
+    const payload={version:2,exportedAt:new Date().toISOString(),count:load().length,wines:load()};
+    _dl(new Blob([JSON.stringify(payload,null,2)],{type:"application/json"}),"cochez-cellar-"+date+".json");
+  },
+  importBackup(file){
+    return new Promise((resolve,reject)=>{
+      const r=new FileReader();
+      r.onload=e=>{
+        try{
+          const data=JSON.parse(e.target.result);
+          const wines=Array.isArray(data)?data:(Array.isArray(data.wines)?data.wines:null);
+          if(!wines) throw new Error("No wine data found in this file.");
+          _wines=wines; persist(); resolve(wines.length);
+        }catch(err){ reject(err); }
+      };
+      r.onerror=()=>reject(new Error("Could not read file."));
+      r.readAsText(file);
+    });
+  },
+  getAutoBackup(){ return _autoBackup; },
+  setAutoBackup(on){ _autoBackup=!!on; try{ localStorage.setItem(AUTO_BACKUP_LS,String(_autoBackup)); }catch(e){} },
+  scheduleAutoBackup(){
+    if(!_autoBackup) return;
+    clearTimeout(_bkTimer);
+    _bkTimer=setTimeout(()=>Cellar.exportBackup(),3000);
+  },
 };
 
 // React hook

@@ -1,12 +1,48 @@
 # Cloudflare Pages custom headers
-# https://developers.cloudflare.com/pages/configuration/headers/
 
-# Manifest must use the spec-correct MIME type for Chrome on Android
+# Manifest — Chrome Android requires this exact MIME type
 /manifest.json
   Content-Type: application/manifest+json
   Cache-Control: no-cache
 
-# Service worker must never be cached — always serve fresh
+# Service worker — must never be cached so the browser always checks for updates
 /sw.js
-  Content-Type: application/javascript; charset=utf-8
   Cache-Control: no-cache, no-store, must-revalidate
+
+# App shell — always fresh so updates are picked up immediately
+/index.html
+  Cache-Control: no-cache
+
+# App source files
+/store.jsx
+  Cache-Control: no-cache
+/ui.jsx
+  Cache-Control: no-cache
+/claude-bridge.js
+  Cache-Control: no-cache
+/app-adaptive.jsx
+  Cache-Control: no-cache
+/app-ipad.jsx
+  Cache-Control: no-cache
+/screen-scan.jsx
+  Cache-Control: no-cache
+/screen-confirm.jsx
+  Cache-Control: no-cache
+/screen-cellar.jsx
+  Cache-Control: no-cache
+/screen-cellar-ipad.jsx
+  Cache-Control: no-cache
+/screen-detail.jsx
+  Cache-Control: no-cache
+/screen-tonight.jsx
+  Cache-Control: no-cache
+/screen-pairing.jsx
+  Cache-Control: no-cache
+/screen-stats.jsx
+  Cache-Control: no-cache
+/location-picker.jsx
+  Cache-Control: no-cache
+/styles.css
+  Cache-Control: no-cache
+/styles-ipad.css
+  Cache-Control: no-cache

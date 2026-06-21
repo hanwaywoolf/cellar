@@ -103,6 +103,72 @@ function SlotSettings({ slots, onChange, onClose }){
   );
 }
 
+function BackupSheet({ onClose }){
+  const [autoOn, setAutoOn] = React.useState(()=>Cellar.getAutoBackup());
+  const [status, setStatus] = React.useState(null);
+  const fileRef = React.useRef();
+
+  const toggleAuto = () => {
+    const next = !autoOn;
+    setAutoOn(next);
+    Cellar.setAutoBackup(next);
+  };
+
+  const doExport = () => {
+    Cellar.exportBackup();
+    setStatus({ ok:true, msg:"Backup downloading\u2026" });
+  };
+
+  const doImport = async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try {
+      const count = await Cellar.importBackup(file);
+      setStatus({ ok:true, msg:"Restored "+count+" wines successfully." });
+    } catch(err) {
+      setStatus({ ok:false, msg:err.message });
+    }
+    e.target.value = "";
+  };
+
+  return (
+    <Sheet onClose={onClose}>
+      <div style={{padding:"6px 20px 32px"}}>
+        <div style={{fontSize:20,fontWeight:600,marginBottom:4}}>Backup & Restore</div>
+        <div className="muted" style={{fontSize:13,marginBottom:20}}>Your cellar is stored in this browser. Export a backup before clearing your cache or switching devices.</div>
+
+        {status && (
+          <div style={{
+            padding:"10px 14px",borderRadius:10,marginBottom:14,fontSize:14,fontWeight:500,
+            background:status.ok?"rgba(109,31,47,0.08)":"rgba(192,57,43,0.1)",
+            color:status.ok?"var(--wine)":"#c0392b"
+          }}>{status.msg}</div>
+        )}
+
+        <button onClick={doExport} className="btn primary" style={{width:"100%",justifyContent:"center",gap:8,marginBottom:10}}>
+          <Ico n="download" s={17}/>Export backup (.json)
+        </button>
+        <button onClick={()=>fileRef.current.click()} className="btn" style={{width:"100%",justifyContent:"center",gap:8}}>
+          <Ico n="refresh" s={17}/>Import backup\u2026
+        </button>
+        <input ref={fileRef} type="file" accept=".json,application/json" style={{display:"none"}} onChange={doImport}/>
+
+        <div style={{marginTop:22,paddingTop:18,borderTop:"1px solid var(--line)"}}>
+          <button onClick={toggleAuto} style={{display:"flex",alignItems:"center",justifyContent:"space-between",width:"100%",textAlign:"left"}}>
+            <div>
+              <div style={{fontSize:15,fontWeight:600}}>Auto-backup after scan</div>
+              <div className="muted" style={{fontSize:12.5,marginTop:2,maxWidth:240}}>Downloads a fresh backup 3 seconds after each new bottle is added.</div>
+            </div>
+            <div style={{flex:"0 0 auto",marginLeft:16,width:46,height:26,borderRadius:13,background:autoOn?"var(--wine)":"var(--line2)",position:"relative",transition:"background .2s"}}>
+              <div style={{position:"absolute",top:3,left:autoOn?23:3,width:20,height:20,borderRadius:"50%",background:"white",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+            </div>
+          </button>
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
 function CellarScreen({ onOpen, openScan, filters, setFilters }){
   const wines = useCellar();
   const [q, setQ] = React.useState("");
@@ -115,6 +181,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
     return DEFAULT_SLOTS;
   });
   const setListSlots = v => { setListSlotsRaw(v); try{localStorage.setItem(LS_SLOTS,JSON.stringify(v));}catch(e){} }; // country|region|class|varietal|vintage|status|sort
+  const [showBackup, setShowBackup] = React.useState(false);
 
   const { color, country, region, cls, varietal, vintage, status, storage } = filters;
   const patch = p => setFilters(f=>({ ...f, ...p }));
@@ -170,6 +237,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
           <div className="sub">{totalBottles} bottles · {fmt$(totalValue)} value</div>
         </div>
         <div style={{display:"flex",gap:6}}>
+          <button className="icon-btn" onClick={()=>setShowBackup(true)}><Ico n="download" s={19}/></button>
           <button className="icon-btn" onClick={()=>setPicker("slots")}><Ico n="sliders" s={19}/></button>
           <button className="icon-btn" onClick={()=>setShowSearch(s=>!s)}><Ico n="search" s={20}/></button>
         </div>
@@ -262,6 +330,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
       {picker==="reviewer" && <Picker title="Reviewed by" sub="Show wines scored by a specific critic" options={reviewerOpts} current={reviewer} onClose={()=>setPicker(null)} onPick={setReviewer}/>}
       {picker==="sort" && <Picker title="Sort by" options={Object.entries(SORTS).map(([k,v])=>({value:k,label:v.label,count:""}))} current={sort} onClose={()=>setPicker(null)} onPick={setSort}/>}
       {picker==="slots" && <SlotSettings slots={listSlots} onChange={setListSlots} onClose={()=>setPicker(null)}/>}
+      {showBackup && <BackupSheet onClose={()=>setShowBackup(false)}/>}
     </>
   );
 }
