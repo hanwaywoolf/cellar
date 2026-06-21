@@ -196,7 +196,7 @@ function DetailPanel({ id, onClose }){
             <Ico n="glass" s={17}/>Finish bottle
           </button>
         ) : (
-          <button className="btn primary block" style={{flex:1,height:48}} onClick={()=>setOpenSheet(true)}>
+          <button className="btn primary block" style={{flex:1}} onClick={()=>setOpenSheet(true)}>
             <Ico n="bottle" s={17}/>Open a bottle
           </button>
         )}

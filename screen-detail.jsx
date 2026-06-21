@@ -157,15 +157,15 @@ function DetailScreen({ id, onClose }){
       {/* action bar */}
       <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 32%)",padding:"20px 18px calc(env(safe-area-inset-bottom,0) + 16px)",display:"flex",gap:12,alignItems:"center"}}>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
-          <span className="section-label" style={{fontSize:9.5}}>Bottles</span>
+          <span className="section-label">Bottles</span>
           <QtyStepper value={w.qty} onChange={v=>Cellar.setQty(w.id, v)} min={0}/>
         </div>
         {cor ? (
-          <button className="btn primary block" style={{flex:1,height:52}} onClick={finishCoravin}>
+          <button className="btn primary block" style={{flex:1}} onClick={finishCoravin}>
             <Ico n="glass" s={18}/>Finish the bottle
           </button>
         ) : (
-          <button className="btn primary block" style={{flex:1,height:52}} onClick={()=>setOpenSheet(true)}>
+          <button className="btn primary block" style={{flex:1}} onClick={()=>setOpenSheet(true)}>
             <Ico n="bottle" s={18}/>Open a bottle
           </button>
         )}
