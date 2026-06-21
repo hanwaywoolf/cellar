@@ -1,0 +1,213 @@
+/* store.jsx — cellar data model, persistence, status logic, AI identify */
+
+const THIS_YEAR = 2026;
+const LS_KEY = "cellar_wines_v2";
+
+// ---------- persistence ----------
+let _wines = null;
+const listeners = new Set();
+function uid(){ return "w_" + Math.random().toString(36).slice(2,9) + Date.now().toString(36).slice(-3); }
+
+function load(){
+  if(_wines) return _wines;
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(raw){ _wines = JSON.parse(raw); }
+  }catch(e){}
+  if(!_wines){
+    _wines = [];
+    persist();
+  }
+  return _wines;
+}
+function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(_wines)); }catch(e){} listeners.forEach(fn=>fn()); }
+
+const Cellar = {
+  all(){ return load(); },
+  get(id){ return load().find(w=>w.id===id); },
+  add(w){ const item = { id:uid(), addedAt:Date.now(), qty:1, photo:null, ...w }; _wines=[item, ...load()]; persist(); return item; },
+  // Find an existing wine that matches producer+cuvée+vintage+color (case-insensitive)
+  findDuplicate(w){
+    const norm = s => (s||"").trim().toLowerCase();
+    return load().find(e =>
+      norm(e.producer)===norm(w.producer) &&
+      norm(e.cuvee)===norm(w.cuvee) &&
+      e.vintage==w.vintage &&
+      norm(e.color)===norm(w.color)
+    );
+  },
+  // Add or merge: if exact bottle exists, increment qty and return existing; otherwise add new
+  addOrMerge(w, addQty=1){
+    const existing = Cellar.findDuplicate(w);
+    if(existing){
+      Cellar.setQty(existing.id, (existing.qty||1) + addQty);
+      return { ...Cellar.get(existing.id), merged:true };
+    }
+    return { ...Cellar.add({ ...w, qty:addQty }), merged:false };
+  },
+  update(id, patch){ _wines = load().map(w=> w.id===id ? {...w, ...patch} : w); persist(); },
+  setQty(id, qty){ qty=Math.max(0,qty); if(qty===0){ Cellar.remove(id); return; } Cellar.update(id,{qty}); },
+  remove(id){ _wines = load().filter(w=>w.id!==id); persist(); },
+  openCoravin(id){ Cellar.update(id, { coravin:{ openedAt: Date.now() } }); },
+  reseal(id){ Cellar.update(id, { coravin:null }); },
+  finishBottle(id){ const w=Cellar.get(id); if(!w) return; const qty=(w.qty||1)-1; if(qty<=0){ Cellar.remove(id); } else { Cellar.update(id, { qty, coravin:null }); } },
+  subscribe(fn){ listeners.add(fn); return ()=>listeners.delete(fn); },
+};
+
+// React hook
+function useCellar(){
+  const [, force] = React.useReducer(x=>x+1, 0);
+  React.useEffect(()=> Cellar.subscribe(force), []);
+  return Cellar.all();
+}
+
+// ---------- status logic ----------
+function statusOf(w, year=THIS_YEAR){
+  if(w.drinkTo && year > w.drinkTo) return "past";
+  if(w.peakFrom && w.peakTo && year >= w.peakFrom && year <= w.peakTo) return "now";
+  if(w.peakFrom && year < w.peakFrom){
+    return (w.drinkFrom && year >= w.drinkFrom) ? "soon" : "hold";
+  }
+  if(w.peakTo && year > w.peakTo) return "soon"; // past peak but drinkable → drink up
+  return "hold";
+}
+const STATUS_LABEL = { now:"Drink now", soon:"Drink soon", hold:"Hold", past:"Past peak" };
+function statusLabel(w){
+  const s = statusOf(w);
+  if(s==="hold" && w.peakFrom) return `Hold → ${w.peakFrom}`;
+  return STATUS_LABEL[s];
+}
+function windowText(w){
+  if(!w.drinkFrom) return "—";
+  return `${w.drinkFrom}–${w.drinkTo}` + (w.peakFrom?`  ·  peak ${w.peakFrom}–${w.peakTo}`:"");
+}
+// position 0..1 of "now" across the drink window, + peak band
+function meterGeom(w){
+  const a=w.drinkFrom, b=w.drinkTo; if(!a||!b||b<=a) return null;
+  const clamp=v=>Math.max(0,Math.min(1,v));
+  return {
+    now: clamp((THIS_YEAR-a)/(b-a)),
+    peakL: clamp((w.peakFrom-a)/(b-a)),
+    peakR: clamp((w.peakTo-a)/(b-a)),
+  };
+}
+const fmt$ = n => n==null ? "—" : "$" + Math.round(n).toLocaleString();
+const COLOR_HEX = { Red:"#7a2233", White:"#c8a93f", "Rosé":"#d98a8f", Rose:"#d98a8f", Sparkling:"#b88a2a" };
+
+// ---------- professional critic ratings ----------
+const RATING_SOURCES = { RP:"Robert Parker", JS:"James Suckling", WS:"Wine Spectator", AG:"Vinous", JR:"Jancis Robinson", D:"Decanter", WE:"Wine Enthusiast" };
+function ratingsList(w){
+  if(!w||!w.ratings) return [];
+  return Object.entries(w.ratings).filter(([k,v])=>v!=null&&v>0).sort((a,b)=>b[1]-a[1]);
+}
+
+// ---------- Coravin preservation (3-year window) ----------
+const CORAVIN_DAYS = 365*3;
+function coravinInfo(w){
+  if(!w || !w.coravin || !w.coravin.openedAt) return null;
+  const total = CORAVIN_DAYS*86400000;
+  const left = (w.coravin.openedAt + total) - Date.now();
+  return { total, leftMs:left, leftDays:Math.ceil(left/86400000), frac:Math.max(0,Math.min(1,left/total)), expired:left<=0, drinkBy:w.coravin.openedAt+total, openedAt:w.coravin.openedAt };
+}
+function coravinText(w){
+  const c = coravinInfo(w); if(!c) return null;
+  if(c.expired) return "Window passed — drink now";
+  const d = c.leftDays;
+  if(d>=365){ const y=Math.floor(d/365); const mo=Math.round((d%365)/30.44); return mo ? (y+"y "+mo+"mo left") : (y+"y left"); }
+  if(d>=60) return Math.round(d/30.44)+" months left";
+  if(d>=1) return d+(d===1?" day left":" days left");
+  return "Drink today";
+}
+
+// ---------- AI identify from OCR text ----------
+async function identifyFromText(ocrText){
+  const prompt = `You are a master sommelier and wine database. Text was OCR-scanned from a wine bottle label (it may be messy, partial, or contain noise). Identify the wine and return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
+{"producer":string,"cuvee":string,"vintage":number,"color":"Red"|"White"|"Rosé"|"Sparkling","country":string,"region":string,"subregion":string,"appellation":string,"classification":string,"varietal":string,"abv":number,"critScore":number,"drinkFrom":number,"drinkTo":number,"peakFrom":number,"peakTo":number,"valueLow":number,"valueHigh":number,"valueEst":number,"pairings":string[],"tasting":string,"body":number,"tannin":number,"acidity":number,"sweetness":number,"ratings":{"RP":number|null,"JS":number|null,"WS":number|null,"AG":number|null,"JR":number|null,"D":number|null,"WE":number|null},"confidence":number}
+Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for unknown. critScore = the single highest score. confidence 0-100 = how sure you are of the identification. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.
+
+OCR TEXT:
+"""${ocrText.slice(0,1200)}"""`;
+  const raw = await window.claude.complete(prompt);
+  let obj;
+  try{
+    const m = raw.match(/\{[\s\S]*\}/);
+    obj = JSON.parse(m ? m[0] : raw);
+  }catch(e){
+    throw new Error("Could not read that label. Try again or enter details manually.");
+  }
+  // coerce numbers
+  ["vintage","abv","critScore","drinkFrom","drinkTo","peakFrom","peakTo","valueLow","valueHigh","valueEst","body","tannin","acidity","sweetness","confidence"]
+    .forEach(k=>{ if(obj[k]!=null) obj[k]=Number(obj[k]); });
+  if(!Array.isArray(obj.pairings)) obj.pairings = obj.pairings? [String(obj.pairings)] : [];
+  return obj;
+}
+
+// ---------- AI identify directly from the label photo (vision) ----------
+// Far more reliable than OCR for real bottles — gold-on-black, embossed,
+// curved, or decorative labels that defeat text recognition.
+const WINE_SCHEMA = `{"producer":string,"cuvee":string,"vintage":number,"color":"Red"|"White"|"Rosé"|"Sparkling","country":string,"region":string,"subregion":string,"appellation":string,"classification":string,"varietal":string,"abv":number,"critScore":number,"drinkFrom":number,"drinkTo":number,"peakFrom":number,"peakTo":number,"valueLow":number,"valueHigh":number,"valueEst":number,"pairings":string[],"tasting":string,"body":number,"tannin":number,"acidity":number,"sweetness":number,"ratings":{"RP":number|null,"JS":number|null,"WS":number|null,"AG":number|null,"JR":number|null,"D":number|null,"WE":number|null},"labelText":string,"confidence":number}`;
+
+function parseWine(raw){
+  let obj;
+  try{
+    const m = raw.match(/\{[\s\S]*\}/);
+    obj = JSON.parse(m ? m[0] : raw);
+  }catch(e){
+    throw new Error("Could not read that label. Try again or enter details manually.");
+  }
+  ["vintage","abv","critScore","drinkFrom","drinkTo","peakFrom","peakTo","valueLow","valueHigh","valueEst","body","tannin","acidity","sweetness","confidence"]
+    .forEach(k=>{ if(obj[k]!=null) obj[k]=Number(obj[k]); });
+  if(obj.confidence!=null && obj.confidence<=1) obj.confidence = Math.round(obj.confidence*100); // accept 0-1 or 0-100
+  if(!Array.isArray(obj.pairings)) obj.pairings = obj.pairings? [String(obj.pairings)] : [];
+  // normalize ratings
+  if(obj.ratings && typeof obj.ratings==="object"){
+    Object.keys(obj.ratings).forEach(k=>{ if(obj.ratings[k]!=null){ obj.ratings[k]=Number(obj.ratings[k]); if(isNaN(obj.ratings[k])) obj.ratings[k]=null; } });
+  } else { obj.ratings = {}; }
+  // set critScore from highest rating if not already set
+  if(!obj.critScore){ const vals=Object.values(obj.ratings||{}).filter(v=>v!=null&&v>0); if(vals.length) obj.critScore=Math.max(...vals); }
+  return obj;
+}
+
+async function identifyFromImage(imageDataUrl){
+  if(!window.claude || !window.claude.complete){
+    throw new Error("The wine-ID service isn’t connected here. Scanning needs the Claude AI bridge, which is available in the Anthropic preview — a plain static host (e.g. Netlify) needs a small API proxy first.");
+  }
+  const m = /^data:(image\/[a-z0-9.+-]+);base64,(.*)$/i.exec(imageDataUrl) || [];
+  const media_type = m[1] || "image/jpeg";
+  const data = m[2] || (imageDataUrl.split(",")[1] || imageDataUrl);
+  const instruction = `You are a master sommelier with an encyclopedic wine database. Study this photo of a wine bottle label and identify the wine. Read every legible word — including small print, foil/gold lettering, and embossed or low-contrast text. Use producer logos and visual cues. Then return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
+${WINE_SCHEMA}
+Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. labelText = the exact words you can read on the label, comma-separated. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker/Wine Advocate, JS=James Suckling, WS=Wine Spectator, AG=Antonio Galloni/Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for any you don't know — only include scores you're confident about. critScore = the single highest/most authoritative score. confidence 0-100 = how sure you are of the identification. If the producer or wine is unclear, still give your best expert guess and lower the confidence. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.`;
+  const raw = await window.claude.complete({ messages:[{ role:"user", content:[
+    { type:"image", source:{ type:"base64", media_type, data } },
+    { type:"text", text:instruction }
+  ]}]});
+  return parseWine(raw);
+}
+
+// Refresh just the ratings for a wine already in the cellar (text-only, no image)
+async function refreshRatings(id){
+  if(!window.claude || !window.claude.complete) throw new Error("AI service not connected.");
+  const w = Cellar.get(id);
+  if(!w) throw new Error("Wine not found.");
+  const prompt = `You are a master sommelier. Return ONLY a JSON object (no markdown) with professional critic scores for this specific wine:
+Producer: ${w.producer}
+Cuvée: ${w.cuvee||""}
+Vintage: ${w.vintage||"NV"}
+Varietal: ${w.varietal||""}
+Region: ${w.region||""}, ${w.country||""}
+Classification: ${w.classification||""}
+
+Keys: {"RP":number|null,"JS":number|null,"WS":number|null,"AG":number|null,"JR":number|null,"D":number|null,"WE":number|null,"critScore":number}
+RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Robinson (100-pt), D=Decanter, WE=Wine Enthusiast. Use null for scores you don't know. critScore = the highest. Only include scores you're confident are real published scores for this exact wine+vintage.`;
+  const raw = await window.claude.complete(prompt);
+  let obj;
+  try{ const m=raw.match(/\{[\s\S]*\}/); obj=JSON.parse(m?m[0]:raw); }catch(e){ throw new Error("Couldn't parse ratings."); }
+  const ratings = {};
+  Object.keys(RATING_SOURCES).forEach(k=>{ if(obj[k]!=null) ratings[k]=Number(obj[k]); });
+  const critScore = obj.critScore ? Number(obj.critScore) : Math.max(0,...Object.values(ratings).filter(v=>v!=null&&v>0));
+  Cellar.update(id, { ratings, critScore: critScore||w.critScore });
+  return ratings;
+}
+
+Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, STATUS_LABEL, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR });

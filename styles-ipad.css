@@ -1,0 +1,198 @@
+/* Cellar iPad — sidebar nav, split-view, wider density
+   Inherits all base tokens + components from styles.css,
+   then overrides layout for tablet screens.
+   When used in the adaptive build, .app-ipad scopes the iPad layout;
+   .app-phone retains the original phone constraints. */
+
+/* ---------- App shell variants ---------- */
+.app-ipad{
+  width:100%; max-width:none; min-height:100dvh;
+  display:grid;
+  grid-template-columns:72px 1fr;
+  grid-template-rows:1fr;
+  background:var(--bg);
+}
+.app-ipad.detail-open{
+  grid-template-columns:72px 1fr 420px;
+}
+.app-phone{
+  width:100%; max-width:440px; min-height:100dvh;
+  margin:0 auto;
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar{
+  grid-row:1; grid-column:1;
+  display:flex; flex-direction:column; align-items:center;
+  padding:24px 0 20px; gap:6px;
+  background:var(--wine2);
+  color:rgba(243,230,207,.55);
+  z-index:30;
+  border-right:1px solid rgba(0,0,0,.18);
+}
+.sidebar .brand{
+  width:42px; height:42px; border-radius:12px;
+  background:var(--wine);
+  display:grid; place-items:center;
+  margin-bottom:18px;
+  color:#f3e6cf;
+  font-weight:800; font-size:15px; letter-spacing:-.5px;
+}
+.sidebar .nav-btn{
+  width:54px; height:54px; border-radius:14px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:3px;
+  font-size:9.5px; font-weight:600; letter-spacing:.2px;
+  color:rgba(243,230,207,.5);
+  transition:all .15s;
+  cursor:pointer;
+}
+.sidebar .nav-btn:hover{
+  color:rgba(243,230,207,.8);
+  background:rgba(243,230,207,.08);
+}
+.sidebar .nav-btn.on{
+  color:#f3e6cf;
+  background:rgba(243,230,207,.14);
+}
+.sidebar .nav-btn svg{ width:22px; height:22px; }
+.sidebar .scan-btn{
+  width:50px; height:50px; border-radius:50%;
+  background:var(--wine);
+  border:2px solid rgba(243,230,207,.35);
+  color:#f3e6cf;
+  display:grid; place-items:center;
+  margin-top:6px;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  transition:all .15s;
+  cursor:pointer;
+}
+.sidebar .scan-btn:hover{
+  background:#8b2b3e;
+  border-color:rgba(243,230,207,.55);
+}
+.sidebar .scan-btn svg{ width:24px; height:24px; }
+.sidebar .spacer{ flex:1; }
+
+/* ---------- Main content area ---------- */
+.main-area{
+  grid-row:1; grid-column:2;
+  display:flex; flex-direction:column;
+  min-height:0; overflow:hidden;
+  background:var(--bg);
+}
+.main-area .screen-wrap{
+  flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding-bottom:26px;
+}
+.main-area .screen-wrap::-webkit-scrollbar{ display:none; }
+.main-area .topbar{
+  position:sticky; top:0; z-index:20;
+  padding:20px 28px 14px;
+  background:var(--bg);
+}
+.main-area .topbar h1{ font-size:30px; }
+
+/* ---------- Detail side panel ---------- */
+.detail-panel{
+  grid-row:1; grid-column:3;
+  border-left:1px solid var(--line2);
+  background:var(--bg);
+  display:flex; flex-direction:column;
+  min-height:0; overflow:hidden;
+  animation:slideIn .25s ease both;
+}
+@keyframes slideIn{ from{ transform:translateX(30px); opacity:0; } to{ transform:translateX(0); opacity:1; } }
+.detail-panel .screen-wrap{
+  flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  padding-bottom:100px;
+}
+.detail-panel .screen-wrap::-webkit-scrollbar{ display:none; }
+
+/* ---------- iPad Cellar list — denser rows ---------- */
+.ipad-list .wine-row{
+  padding:14px 0;
+  gap:15px;
+}
+.ipad-list .wine-name{ font-size:15.5px; }
+.ipad-list .wine-row.selected{
+  background:var(--wine-tint);
+  margin:0 -28px;
+  padding-left:28px;
+  padding-right:28px;
+  border-radius:0;
+}
+
+/* ---------- Wine table ---------- */
+.wine-table{ width:100%; border-collapse:collapse; }
+.wine-table th{
+  text-align:left; font-size:10.5px; font-weight:600;
+  letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);
+  padding:0 8px 10px; white-space:nowrap; border-bottom:1px solid var(--line2);
+}
+.wine-table th:first-child{ padding-left:0; }
+.wine-table td{
+  padding:13px 8px; font-size:14px; vertical-align:middle;
+  border-bottom:1px solid var(--line);
+}
+.wine-table td:first-child{ padding-left:0; }
+.wine-table tr{ cursor:pointer; transition:background .1s; }
+.wine-table tr:hover{ background:rgba(109,31,47,.03); }
+.wine-table tr.selected{ background:var(--wine-tint); }
+.wine-table .td-name{
+  font-weight:400; font-size:15px; line-height:1.2;
+  max-width:280px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.wine-table .td-name .cuvee{ font-weight:600; }
+
+/* ---------- iPad: sheets → centered modals ---------- */
+.app-ipad ~ .sheet-scrim,
+body:has(.app-ipad) .sheet-scrim{
+  align-items:center;
+  justify-content:center;
+}
+.app-ipad ~ .sheet-scrim .sheet,
+body:has(.app-ipad) .sheet-scrim .sheet{
+  max-width:460px;
+  border-radius:16px;
+  max-height:80dvh;
+  box-shadow:0 24px 60px rgba(0,0,0,.2), 0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* ---------- iPad: full-screen overlays → centered panels ---------- */
+.app-ipad .full-screen{
+  left:50%; transform:translateX(-50%);
+  max-width:540px;
+}
+
+/* ---------- iPad: hide phone tabbar ---------- */
+.app-ipad .tabbar{ display:none !important; }
+
+/* ---------- Content padding ---------- */
+.main-area .topbar + .screen-wrap > div{
+  padding-left:28px !important;
+  padding-right:28px !important;
+}
+
+/* ---------- Wider cards ---------- */
+.main-area .card{ border-radius:12px; }
+.main-area .empty{ padding:60px 40px; }
+
+/* ---------- Confirm form ---------- */
+.app-ipad .full-screen .screen-wrap > div{
+  max-width:480px;
+  margin:0 auto;
+}
+
+/* ---------- Responsive: smaller iPads ---------- */
+@media (max-width:900px){
+  .app-ipad.detail-open{
+    grid-template-columns:72px 1fr;
+  }
+  .detail-panel{
+    position:fixed; right:0; top:0; bottom:0;
+    width:400px; z-index:50;
+    box-shadow:-8px 0 40px rgba(0,0,0,.15);
+    grid-column:unset;
+  }
+}
