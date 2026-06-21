@@ -47,55 +47,66 @@
 <script type="text/babel" src="screen-stats.jsx"></script>
 <script type="text/babel" src="app-ipad.jsx"></script>
 <script type="text/babel" src="app-adaptive.jsx"></script>
+<style>
+#pwa-update {
+  display: none;
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  z-index: 9999; align-items: center; gap: 12px;
+  background: #1a1a1a; color: #f3e6cf;
+  padding: 12px 18px; border-radius: 12px;
+  font-family: system-ui, sans-serif; font-size: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4);
+  white-space: nowrap;
+}
+#pwa-update.visible { display: flex; }
+#pwa-update button {
+  background: #6d1f2f; color: #f3e6cf; border: none;
+  padding: 7px 16px; border-radius: 8px;
+  font-weight: 700; font-size: 13px; cursor: pointer;
+}
+</style>
+
+<div id="pwa-update">
+  <span>Update available</span>
+  <button onclick="window._applyUpdate()">Refresh</button>
+</div>
+
 <script>
-// Service worker registration
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').then(reg => {
-    console.log('[PWA] SW registered, scope:', reg.scope);
-  }).catch(err => {
-    console.warn('[PWA] SW registration failed:', err);
+    // New SW waiting on first load
+    if (reg.waiting) showUpdate(reg);
+
+    // New SW found after page already loaded
+    reg.addEventListener('updatefound', () => {
+      const sw = reg.installing;
+      sw.addEventListener('statechange', () => {
+        if (sw.state === 'installed' && navigator.serviceWorker.controller) {
+          showUpdate(reg);
+        }
+      });
+    });
+  }).catch(err => console.warn('[PWA] SW registration failed:', err));
+
+  // When the new SW takes over, reload to get fresh assets
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!reloading) { reloading = true; location.reload(); }
   });
 }
 
-// Install prompt — shows a banner when Chrome decides the app is installable
-let _installPrompt = null;
+function showUpdate(reg) {
+  const toast = document.getElementById('pwa-update');
+  if (toast) toast.classList.add('visible');
+  window._updateReg = reg;
+}
 
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  _installPrompt = e;
-  const banner = document.getElementById('pwa-banner');
-  if (banner) banner.removeAttribute('hidden');
-});
-
-window.addEventListener('appinstalled', () => {
-  const banner = document.getElementById('pwa-banner');
-  if (banner) banner.setAttribute('hidden', '');
-  _installPrompt = null;
-});
-
-window.triggerInstall = function () {
-  if (!_installPrompt) return;
-  _installPrompt.prompt();
-  _installPrompt.userChoice.then(() => { _installPrompt = null; });
-  document.getElementById('pwa-banner').setAttribute('hidden', '');
+window._applyUpdate = function () {
+  const reg = window._updateReg;
+  if (reg && reg.waiting) {
+    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+  }
 };
 </script>
-
-<!-- PWA install banner — only visible when Chrome fires beforeinstallprompt -->
-<div id="pwa-banner" hidden style="
-  position: fixed; bottom: 0; left: 0; right: 0; z-index: 9999;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 20px; gap: 12px;
-  background: #6d1f2f; color: #f3e6cf;
-  font-family: system-ui, sans-serif; font-size: 15px;
-  box-shadow: 0 -2px 16px rgba(0,0,0,0.3);
-">
-  <span>Add CoChez Cellar to your Home Screen</span>
-  <button onclick="triggerInstall()" style="
-    background: #f3e6cf; color: #6d1f2f; border: none;
-    padding: 8px 18px; border-radius: 8px;
-    font-weight: 700; font-size: 14px; cursor: pointer;
-  ">Install</button>
-</div>
 </body>
 </html>

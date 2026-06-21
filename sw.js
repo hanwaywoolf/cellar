@@ -1,9 +1,19 @@
 // Service worker for CoChez Cellar — v3
-// Installs and activates immediately; caches lazily on network success.
+// Does NOT auto-skip waiting — lets the app show "Update available" toast
+// and only takes over when the user taps Refresh.
 
 const CACHE = 'cochez-v3';
 
-self.addEventListener('install', () => self.skipWaiting());
+// First install: no existing controller, safe to skip waiting immediately.
+// Subsequent updates: stay in waiting state until app sends SKIP_WAITING.
+self.addEventListener('install', () => {
+  if (!self.registration.active) self.skipWaiting();
+});
+
+// Listen for the app's "Refresh" button
+self.addEventListener('message', e => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 self.addEventListener('activate', e => {
   e.waitUntil(
