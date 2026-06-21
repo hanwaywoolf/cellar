@@ -1,7 +1,6 @@
 # CoChez Cellar
 
-A mobile-first wine cellar app with AI label scanning, powered by Claude.  
-Hosted on **Cloudflare Pages** with automatic deploys from GitHub.
+A mobile-first wine cellar app with AI label scanning. Push to `main` → Cloudflare deploys automatically.
 
 ---
 
@@ -9,25 +8,29 @@ Hosted on **Cloudflare Pages** with automatic deploys from GitHub.
 
 ```
 index.html              ← app entry point
+_worker.js              ← Cloudflare Pages Worker (proxies to Anthropic API)
 manifest.json           ← PWA manifest
-sw.js                   ← service worker
-_headers                ← Cloudflare custom headers (MIME types, cache control)
-functions/
-  claude.js             ← Cloudflare Pages Function — proxies /claude to Anthropic API
-icons/                  ← app icons (192, 512, maskable variants, svg)
+sw.js                   ← service worker (offline support)
+icons/                  ← app icons (192, 512, svg)
 styles.css
 styles-ipad.css
-claude-bridge.js
-store.jsx / ui.jsx / screen-*.jsx / app-*.jsx
+claude-bridge.js        ← connects app to /claude proxy
+store.jsx               ← app state
+ui.jsx                  ← shared UI components
+location-picker.jsx
+screen-*.jsx            ← individual screens
+app-*.jsx               ← app shells (phone + iPad)
 ```
-
-> ⚠️ There is **no** `_worker.js` in this repo. The Claude proxy runs as a Pages Function in `functions/claude.js`. Do not add a `_worker.js` — it would override the Functions setup.
 
 ---
 
-## One-time setup
+## ⚙️ One-time setup
 
-### 1. Create the GitHub repo
+### Step 1 — Create the GitHub repo
+
+1. Go to [github.com/new](https://github.com/new)
+2. Name it (e.g. `cellar`), set to **Private**, click **Create repository**
+3. Upload all files from this zip (drag into the GitHub UI, or use git CLI):
 
 ```bash
 git init
@@ -37,13 +40,13 @@ git commit -m "initial commit"
 git push -u origin main
 ```
 
-Or drag-and-drop all files into a new repo via the GitHub web UI.
+---
 
-### 2. Connect to Cloudflare Pages
+### Step 2 — Connect to Cloudflare Pages
 
-1. [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
-2. Authorise GitHub → select this repo
-3. Build settings:
+1. Go to [dash.cloudflare.com](https://dash.cloudflare.com) → **Workers & Pages** → **Create** → **Pages** tab
+2. Click **Connect to Git** → authorise GitHub → select your `cellar` repo
+3. Build settings — set these exactly:
 
    | Setting | Value |
    |---|---|
@@ -51,26 +54,36 @@ Or drag-and-drop all files into a new repo via the GitHub web UI.
    | Build command | *(leave empty)* |
    | Build output directory | `/` |
 
-4. **Save and Deploy**
+4. Click **Save and Deploy**
 
-### 3. Add your Anthropic API key 🔑
+Cloudflare assigns a URL like `https://cellar.pages.dev`.
 
-**Cloudflare dashboard → Workers & Pages → your project → Settings → Variables and Secrets → Add**
+---
 
-| Variable | Value | Type |
+### Step 3 — Add your API key 🔑
+
+> **The API key goes in Cloudflare only — never commit it to GitHub.**
+
+In your Cloudflare Pages project:  
+**Settings** → **Variables and Secrets** → **Add variable**
+
+| Variable name | Value | Type |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | **Secret (encrypt)** |
-| `CLAUDE_MODEL` | `claude-haiku-4-5` | Plain text *(optional)* |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | **Secret** ← select "Encrypt" |
+| `CLAUDE_MODEL` | `claude-haiku-4-5` | Plain text *(optional — cheaper/faster)* |
 
-After saving → **Deployments → Retry deployment** so the Function picks up the secret.
+After saving, go to **Deployments** → latest deploy → **⋯ → Retry deployment** so the Worker picks up the secret.
 
-### 4. Install as a PWA
+> Get an Anthropic key at [console.anthropic.com](https://console.anthropic.com) → **API keys**.  
+> Add a small credit balance — each scan costs ~$0.01 on Sonnet, fractions of a cent on Haiku.
 
-Once deployed, open the `*.pages.dev` URL in **Chrome on Android** or **Safari on iOS/iPadOS**.
+---
 
-- A burgundy **"Install"** banner appears at the bottom when Chrome is ready — tap it
-- Or: Chrome ⋯ menu → **Install app**
-- iOS Safari: Share → **Add to Home Screen**
+### Step 4 — Install as a PWA on your phone
+
+Open your `*.pages.dev` URL in Safari (iOS) or Chrome (Android):
+- **iOS:** Share → **Add to Home Screen**
+- **Android:** Chrome menu → **Add to Home Screen**
 
 ---
 
@@ -78,17 +91,26 @@ Once deployed, open the `*.pages.dev` URL in **Chrome on Android** or **Safari o
 
 ```bash
 git add .
-git commit -m "your change"
+git commit -m "describe your change"
 git push
 ```
 
-Cloudflare Pages auto-deploys within ~30 seconds.
+That's it — Cloudflare detects the push and deploys within ~30 seconds. No drag-and-drop, no manual steps.
 
 ---
 
-## Custom domain
+## Custom domain (optional)
 
-**Pages project → Custom domains → Set up a custom domain**
+**Pages project** → **Custom domains** → **Set up a custom domain**  
+Add your domain and follow the DNS prompts. Active in ~1 minute if your domain is already on Cloudflare.
+
+---
+
+## Do I need any secrets in GitHub?
+
+**No** — not for basic deploys. Cloudflare pulls the code directly from GitHub and holds the secret itself.
+
+If you later want to run automated tests or a build step via **GitHub Actions**, you would add `ANTHROPIC_API_KEY` as a GitHub repo secret too (**Settings → Secrets → Actions**). But for this app there's no build step, so it's not needed.
 
 ---
 
@@ -96,7 +118,16 @@ Cloudflare Pages auto-deploys within ~30 seconds.
 
 | Symptom | Fix |
 |---|---|
-| "wine-ID service isn't connected" | `ANTHROPIC_API_KEY` missing — check Variables and redeploy |
-| Camera not working | Must be HTTPS — `*.pages.dev` always is |
-| PWA install not showing | Clear Chrome site data for the domain (lock icon → Site settings → Clear & reset), reload twice |
-| Old version after push | Hard-refresh `Cmd+Shift+R` / `Ctrl+Shift+R` |
+| "wine-ID service isn't connected" | `ANTHROPIC_API_KEY` missing or misspelled in Cloudflare → Variables; redeploy after fixing |
+| Camera not working | Must be HTTPS — `*.pages.dev` always is; custom domains need an active Cloudflare certificate |
+| Stale version after push | Hard-refresh (`Cmd+Shift+R` / `Ctrl+Shift+R`), or check the CF deployment finished |
+| Worker errors | **Workers & Pages** → your project → **Functions** tab → **Logs** |
+
+---
+
+## Cost
+
+| Service | Cost |
+|---|---|
+| Cloudflare Pages | **Free** — unlimited static requests, 100k Worker invocations/day |
+| Anthropic (scanning) | ~$0.01/scan on Sonnet · fraction of a cent on Haiku |
