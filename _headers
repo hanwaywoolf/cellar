@@ -1,12 +1,10 @@
 # Cloudflare Pages custom headers
-# https://developers.cloudflare.com/pages/configuration/headers/
 
-# Manifest must use the spec-correct MIME type for Chrome on Android
+# Manifest — Chrome Android requires this exact MIME type
 /manifest.json
   Content-Type: application/manifest+json
   Cache-Control: no-cache
 
-# Service worker must never be cached — always serve fresh
+# Service worker — must never be cached so updates deploy immediately
 /sw.js
-  Content-Type: application/javascript; charset=utf-8
   Cache-Control: no-cache, no-store, must-revalidate
