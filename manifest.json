@@ -1,10 +1,12 @@
 {
+  "id": "/",
   "name": "CoChez Cellar",
   "short_name": "CoChez",
   "description": "Your personal wine cellar — scan, track, and manage your collection.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
   "background_color": "#6d1f2f",
   "theme_color": "#6d1f2f",
   "orientation": "portrait",
