@@ -53,8 +53,8 @@ input,textarea{ font-family:inherit; color:inherit; }
   padding:calc(env(safe-area-inset-top,0px) + 14px) 18px 12px;
   background:var(--bg);
 }
-.topbar h1{ font-weight:600; font-size:26px; line-height:1.1; margin:0; letter-spacing:-.3px; }
-.topbar .sub{ font-size:12.5px; color:var(--muted); margin-top:2px; white-space:nowrap; font-weight:400; }
+.topbar h1{ font-weight:600; font-size:28px; line-height:1.1; margin:0; letter-spacing:-.3px; }
+.topbar .sub{ font-size:14px; color:var(--muted); margin-top:2px; white-space:nowrap; font-weight:400; }
 .icon-btn{ width:40px; height:40px; border-radius:10px; display:grid; place-items:center; background:var(--card); border:1px solid var(--line2); }
 
 /* ----- Bottom tab bar — minimal, solid background ----- */
@@ -66,7 +66,7 @@ input,textarea{ font-family:inherit; color:inherit; }
   background:var(--bg);
   border-top:1px solid var(--line2);
 }
-.tab{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:5px 0; color:var(--faint); font-size:10px; font-weight:500; letter-spacing:.1px; transition:color .15s; }
+.tab{ display:flex; flex-direction:column; align-items:center; gap:2px; padding:5px 0; color:var(--faint); font-size:12px; font-weight:500; letter-spacing:.1px; transition:color .15s; }
 .tab svg{ width:22px; height:22px; }
 .tab.on{ color:var(--wine); font-weight:600; }
 .tab.scan-tab{ position:relative; }
@@ -79,13 +79,13 @@ input,textarea{ font-family:inherit; color:inherit; }
 
 /* ----- Cards / surfaces — flat, subtle border ----- */
 .card{ background:var(--card); border:1px solid var(--line); border-radius:10px; }
-.section-label{ font-size:10.5px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }
+.section-label{ font-size:12px; font-weight:600; letter-spacing:1.2px; text-transform:uppercase; color:var(--muted); }
 .serif{ font-family:var(--sans); }
 
 /* ----- Chips ----- */
 .chip{
   display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
-  font-size:12px; font-weight:500; padding:5px 11px; border-radius:8px;
+  font-size:14px; font-weight:500; padding:5px 11px; border-radius:8px;
   background:var(--bg2); color:var(--ink); border:1px solid transparent;
 }
 .chip.line{ background:transparent; border-color:var(--line2); }
@@ -96,7 +96,7 @@ input,textarea{ font-family:inherit; color:inherit; }
 .chip-row::-webkit-scrollbar{ display:none; }
 
 /* status pills */
-.stat-pill{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 9px; border-radius:6px; letter-spacing:.1px; }
+.stat-pill{ display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600; padding:3px 9px; border-radius:6px; letter-spacing:.1px; }
 .st-now{ background:#e2f0e8; color:var(--green); }
 .st-soon{ background:#f5ead6; color:var(--amber); }
 .st-hold{ background:#e8ebed; color:var(--slate); }
@@ -105,15 +105,15 @@ input,textarea{ font-family:inherit; color:inherit; }
 .dot.now{ background:var(--green);} .dot.soon{ background:var(--amber);} .dot.hold{ background:var(--slate);} .dot.past{ background:var(--red);}
 
 /* ----- Buttons ----- */
-.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:14px; padding:12px 18px; border-radius:10px; background:var(--card); border:1px solid var(--line2); }
+.btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:16px; padding:12px 18px; border-radius:10px; background:var(--card); border:1px solid var(--line2); }
 .btn.primary{ background:var(--wine); color:#fff; border-color:var(--wine); }
 .btn.block{ width:100%; }
 .btn.ghost{ background:transparent; border-color:var(--line2); }
 .btn svg{ width:18px; height:18px; }
-.btn.sm{ padding:9px 13px; font-size:13px; border-radius:8px; }
+.btn.sm{ padding:9px 13px; font-size:15px; border-radius:8px; }
 
 /* ----- Inputs ----- */
-.field{ width:100%; background:var(--card); border:1px solid var(--line2); border-radius:8px; padding:12px 14px; font-size:14px; font-weight:400; }
+.field{ width:100%; background:var(--card); border:1px solid var(--line2); border-radius:8px; padding:12px 14px; font-size:16px; font-weight:400; }
 .field:focus{ outline:none; border-color:var(--wine); box-shadow:0 0 0 3px rgba(109,31,47,.10); }
 textarea.field{ resize:none; line-height:1.5; }
 
@@ -138,19 +138,19 @@ textarea.field{ resize:none; line-height:1.5; }
 .meter{ position:relative; height:6px; border-radius:30px; background:var(--bg2); overflow:hidden; }
 .meter .peak{ position:absolute; top:0; bottom:0; background:linear-gradient(90deg,var(--gold),#caa44f); opacity:.5; }
 .meter .now{ position:absolute; top:-4px; width:2px; height:14px; border-radius:3px; background:var(--ink); }
-.meter-axis{ display:flex; justify-content:space-between; font-size:10px; color:var(--faint); margin-top:4px; font-weight:500; }
+.meter-axis{ display:flex; justify-content:space-between; font-size:12px; color:var(--faint); margin-top:4px; font-weight:500; }
 
 /* trait bars */
-.trait{ display:grid; grid-template-columns:62px 1fr; align-items:center; gap:10px; font-size:12px; }
+.trait{ display:grid; grid-template-columns:68px 1fr; align-items:center; gap:10px; font-size:14px; }
 .trait .bar{ height:5px; border-radius:30px; background:var(--bg2); overflow:hidden; }
 .trait .bar i{ display:block; height:100%; background:var(--wine); border-radius:30px; }
 
 /* list row */
 .wine-row{ display:flex; gap:13px; align-items:center; padding:11px 0; }
 .wine-row + .wine-row{ border-top:1px solid var(--line); }
-.wine-name{ font-weight:400; font-size:16px; line-height:1.15; letter-spacing:-.1px; }
+.wine-name{ font-weight:400; font-size:18px; line-height:1.15; letter-spacing:-.1px; }
 .wine-name .cuvee{ font-weight:600; }
-.wine-meta{ font-size:12px; color:var(--muted); margin-top:2px; font-weight:400; }
+.wine-meta{ font-size:14px; color:var(--muted); margin-top:2px; font-weight:400; }
 
 /* sheets / modal */
 .sheet-scrim{ position:fixed; inset:0; z-index:60; background:rgba(26,29,35,.38); display:flex; align-items:flex-end; justify-content:center; }
