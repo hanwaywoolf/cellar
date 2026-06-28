@@ -39,6 +39,12 @@
     --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px);
   }
 }
+/* iOS-specific fallback: navigator.standalone sets this class (set in HTML).
+   Covers iPadOS standalone where display-mode/env() can both report wrong. */
+html.pwa-standalone{
+  --safe-top:max(env(safe-area-inset-top,0px), 24px);
+  --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px);
+}
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html,body{ margin:0; padding:0; }
