@@ -1,6 +1,6 @@
 /* screen-cellar.jsx — collection list with search + origin drill-down + sort */
 
-const STATUS_ORDER = { now:0, soon:1, past:2, early:3, hold:4 };
+const STATUS_ORDER = { now:0, soon:1, peak:2, early:3, past:4, hold:5 };
 const SORTS = {
   smart:{ label:"Drink soon", fn:(a,b)=> (STATUS_ORDER[statusOf(a)]-STATUS_ORDER[statusOf(b)]) || ((a.peakTo||9999)-(b.peakTo||9999)) },
   drinkby:{ label:"Drink by (soonest)", fn:(a,b)=> ((a.peakTo||a.drinkTo||9999)-(b.peakTo||b.drinkTo||9999)) || ((a.drinkTo||9999)-(b.drinkTo||9999)) },
@@ -207,7 +207,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
   const byClass = cls? byRegion.filter(w=>w.classification===cls) : byRegion;
   const byVarietal = varietal? byClass.filter(w=>w.varietal===varietal) : byClass;
   const byVintage = vintage? byVarietal.filter(w=>String(w.vintage)===String(vintage)) : byVarietal;
-  const byStatus = status? byVintage.filter(w=>{ const s=statusOf(w); return status==="ready" ? (s==="now"||s==="soon") : s===status; }) : byVintage;
+  const byStatus = status? byVintage.filter(w=>{ const s=statusOf(w); return status==="ready" ? (s==="now"||s==="soon"||s==="peak") : s===status; }) : byVintage;
   const byStorage = storage? byStatus.filter(w=>w.location&&w.location.area===storage) : byStatus;
   const byReviewer = reviewer? byStorage.filter(w=>w.ratings&&w.ratings[reviewer]!=null&&w.ratings[reviewer]>0) : byStorage;
   const ql = q.trim().toLowerCase();
@@ -224,7 +224,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
   const varietalOpts = uniqCounts(byClass, "varietal");
   const vintageOpts = [...new Set(byVarietal.map(w=>w.vintage).filter(Boolean))].sort((a,b)=>b-a)
     .map(y=>({ value:String(y), label:String(y), count: byVarietal.filter(w=>String(w.vintage)===String(y)).length }));
-  const statusOpts = [["now","Drink now"],["soon","Drink soon"],["early","Almost ready"],["hold","Too young"],["past","Past window"]]
+  const statusOpts = [["now","Drink now"],["peak","At peak"],["soon","Drink soon"],["early","Almost ready"],["hold","Too young"],["past","Past window"]]
     .map(([v,l])=>({ value:v, label:l, count: byVintage.filter(w=>statusOf(w)===v).length })).filter(o=>o.count>0);
   const storageOpts = STORAGE_AREAS.map(a=>({ value:a.id, label:a.label, count: byStatus.filter(w=>w.location&&w.location.area===a.id).reduce((s,w)=>s+(w.qty||1),0) })).filter(o=>o.count>0);
   const reviewerOpts = Object.keys(RATING_SOURCES).map(k=>({ value:k, label:k+" — "+RATING_SOURCES[k], count: byStorage.filter(w=>w.ratings&&w.ratings[k]!=null&&w.ratings[k]>0).length })).filter(o=>o.count>0);

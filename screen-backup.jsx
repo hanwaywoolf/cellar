@@ -3,6 +3,7 @@
 
 function BackupScreen({ onClose }){
   const bk = useBackup();
+  const sync = useSync();
   const wines = useCellar();
 
   const [driveList, setDriveList]   = React.useState(null);   // null=not fetched, []=fetched
@@ -50,6 +51,31 @@ function BackupScreen({ onClose }){
 
   function handleLocalBackup(){ bk.saveLocal(); flash("Download started ✓"); }
 
+  async function toggleSync(){
+    if(!sync.enabled){
+      if(!bk.driveConnected){
+        setDriveErr(""); setDriveLoading(true);
+        try{ await bk.connectDrive(clientInput); setClientEditing(false); }
+        catch(e){ setDriveErr(e.message); setDriveLoading(false); return; }
+        setDriveLoading(false);
+      }
+      sync.setEnabled(true);
+      flash("Device sync on — syncing…");
+    } else {
+      sync.setEnabled(false);
+      flash("Device sync paused");
+    }
+  }
+  async function handleSyncNow(){
+    try{ await sync.syncNow(); flash("Synced ✓"); }
+    catch(e){
+      if(e.message==="needs_auth"){
+        try{ await bk.connectDrive(clientInput); await sync.syncNow(); flash("Synced ✓"); }
+        catch(e2){ setDriveErr(e2.message); }
+      } else setDriveErr(e.message);
+    }
+  }
+
   function onFileChange(e){
     const f = e.target.files?.[0]; if(!f) return;
     const name = f.name;
@@ -87,6 +113,30 @@ function BackupScreen({ onClose }){
             {status}
           </div>
         )}
+
+        {/* device sync */}
+        <div className="card" style={{padding:"16px 18px"}}>
+          <div style={{display:"flex",alignItems:"flex-start",gap:12}}>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:14}}>Device sync</div>
+              <div className="muted" style={{fontSize:12,marginTop:3,lineHeight:1.5}}>Keep this cellar in sync across all your devices through Google Drive. A scan on one device shows up on the others.</div>
+            </div>
+            <button onClick={toggleSync} aria-label="Toggle device sync" style={{flex:"0 0 auto",width:46,height:28,borderRadius:20,background:sync.enabled?"var(--green)":"var(--line2)",position:"relative",transition:"background .2s",border:"none"}}>
+              <span style={{position:"absolute",top:3,left:sync.enabled?21:3,width:22,height:22,borderRadius:"50%",background:"#fff",transition:"left .2s",boxShadow:"0 1px 3px rgba(0,0,0,.3)"}}/>
+            </button>
+          </div>
+          {sync.enabled && (
+            <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid var(--line)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
+              <div className="muted" style={{fontSize:12,display:"flex",alignItems:"center",gap:7}}>
+                <span style={{width:8,height:8,borderRadius:"50%",flex:"0 0 auto",background: sync.syncing?"var(--gold)":(sync.lastError==="needs_auth"?"var(--amber)":"var(--green,#2d9a5e)")}}/>
+                {sync.syncing ? "Syncing…" : sync.lastError==="needs_auth" ? "Tap Sync now to reconnect" : ("Last synced "+fmtDate(sync.lastSync))}
+              </div>
+              <button className="btn" style={{height:34,fontSize:12.5,whiteSpace:"nowrap"}} onClick={handleSyncNow} disabled={sync.syncing}>
+                <Ico n="refresh" s={14}/>{sync.syncing?"Syncing…":"Sync now"}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* auto-backup progress */}
         <div className="card" style={{padding:"16px 18px"}}>

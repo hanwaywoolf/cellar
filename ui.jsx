@@ -68,7 +68,8 @@ const Bottle = ({ w, size=54, h }) => {
 
 const StatusPill = ({ w }) => {
   const s = statusOf(w);
-  return <span className={"stat-pill st-"+s}><span className={"dot "+s}/>{statusLabel(w)}</span>;
+  const label = (typeof STATUS_LABEL!=="undefined" && STATUS_LABEL[s]) || s;
+  return <span className={"stat-pill st-"+s}><span className={"dot "+s}/>{label}</span>;
 };
 
 const DrinkMeter = ({ w }) => {

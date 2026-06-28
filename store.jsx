@@ -2,7 +2,7 @@
 
 const THIS_YEAR = 2026;
 const LS_KEY = "cellar_wines_v2";
-const SCHEMA_VERSION = 3; // bump this when the wine object shape changes
+const SCHEMA_VERSION = 4; // bump this when the wine object shape changes
 const DATA_VER_LS = "cellar_schema_version";
 
 // Display currency. The AI now estimates values directly in GBP; legacy
@@ -43,6 +43,16 @@ function migrateWines(wines, fromVersion){
     v = 3;
   }
 
+  // v3 -> v4: multi-device sync. Stamp every wine with updatedAt so merges can
+  // pick the most-recently-changed version of each bottle across devices.
+  if(v < 4){
+    ws = ws.map(function(w){
+      if(w.updatedAt == null) w.updatedAt = w.addedAt || Date.now();
+      return w;
+    });
+    v = 4;
+  }
+
   return ws;
 }
 
@@ -81,10 +91,26 @@ function load(){
 }
 function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(_wines)); }catch(e){} listeners.forEach(fn=>fn()); }
 
+// ---------- tombstones (deleted-wine markers, for multi-device sync) ----------
+const TOMB_LS = "cellar_tombstones";
+let _tombs = null;
+function loadTombs(){
+  if(_tombs) return _tombs;
+  try{ _tombs = JSON.parse(localStorage.getItem(TOMB_LS) || "[]"); }catch(e){ _tombs = []; }
+  if(!Array.isArray(_tombs)) _tombs = [];
+  return _tombs;
+}
+function persistTombs(){ try{ localStorage.setItem(TOMB_LS, JSON.stringify(_tombs)); }catch(e){} }
+function _addTomb(id){ const t=loadTombs().filter(x=>x.id!==id); t.push({ id, deletedAt:Date.now() }); _tombs=t; persistTombs(); }
+
+// ---------- sync hook ----------
+// Local mutations call this; SyncManager (backup.jsx) debounces a push when present.
+function _syncSoon(){ try{ if(window.SyncManager && window.SyncManager.scheduleSync) window.SyncManager.scheduleSync(); }catch(e){} }
+
 const Cellar = {
   all(){ return load(); },
   get(id){ return load().find(w=>w.id===id); },
-  add(w){ const item = { id:uid(), addedAt:Date.now(), qty:1, photo:null, currency:"GBP", ...w }; _wines=[item, ...load()]; persist(); Cellar.scheduleAutoBackup(); return item; },
+  add(w){ const item = { id:uid(), addedAt:Date.now(), updatedAt:Date.now(), qty:1, photo:null, currency:"GBP", ...w }; if(item.updatedAt==null) item.updatedAt=Date.now(); _wines=[item, ...load()]; persist(); Cellar.scheduleAutoBackup(); _syncSoon(); return item; },
   // Find an existing wine that matches producer+cuvée+vintage+color (case-insensitive)
   findDuplicate(w){
     const norm = s => (s||"").trim().toLowerCase();
@@ -104,10 +130,36 @@ const Cellar = {
     }
     return { ...Cellar.add({ ...w, qty:addQty }), merged:false };
   },
-  update(id, patch){ _wines = load().map(w=> w.id===id ? {...w, ...patch} : w); persist(); },
+  update(id, patch){ _wines = load().map(w=> w.id===id ? {...w, ...patch, updatedAt:Date.now()} : w); persist(); _syncSoon(); },
   setQty(id, qty){ qty=Math.max(0,qty); if(qty===0){ Cellar.remove(id); return; } Cellar.update(id,{qty}); },
-  remove(id){ _wines = load().filter(w=>w.id!==id); persist(); },
+  remove(id){ _wines = load().filter(w=>w.id!==id); _addTomb(id); persist(); _syncSoon(); },
   _restore(wines){ _wines = wines; persist(); try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){} },
+  // Snapshot of the full local state for pushing to the cloud.
+  snapshot(){ return { version:SCHEMA_VERSION, syncedAt:Date.now(), wines:load(), tombstones:loadTombs() }; },
+  getTombstones(){ return loadTombs(); },
+  // Merge a remote snapshot into local state. Per-wine last-write-wins by
+  // updatedAt; deletes propagate via tombstones. Returns the merged snapshot.
+  mergeRemote(remote){
+    const rWines = (remote && Array.isArray(remote.wines)) ? remote.wines : [];
+    const rTombs = (remote && Array.isArray(remote.tombstones)) ? remote.tombstones : [];
+    const ts = w => (w && (w.updatedAt || w.addedAt)) || 0;
+    // newest tombstone per id
+    const tombMap = new Map();
+    loadTombs().concat(rTombs).forEach(t=>{ if(!t||!t.id) return; const p=tombMap.get(t.id); if(!p || (t.deletedAt||0) > (p.deletedAt||0)) tombMap.set(t.id,{id:t.id,deletedAt:t.deletedAt||0}); });
+    // newest wine per id
+    const wineMap = new Map();
+    load().concat(rWines).forEach(w=>{ if(!w||!w.id) return; const p=wineMap.get(w.id); if(!p || ts(w) > ts(p)) wineMap.set(w.id, w); });
+    // apply tombstones (a delete wins only if it's newer than the wine)
+    const merged = [];
+    wineMap.forEach((w,id)=>{ const tomb=tombMap.get(id); if(tomb && (tomb.deletedAt||0) >= ts(w)) return; merged.push(w); });
+    merged.sort((a,b)=>(b.addedAt||0)-(a.addedAt||0));
+    // keep only tombstones still relevant (no surviving newer wine)
+    const tombs = [...tombMap.values()].filter(t=>{ const w=wineMap.get(t.id); return !w || (t.deletedAt||0) >= ts(w); });
+    _wines = merged; persist();
+    _tombs = tombs; persistTombs();
+    try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){}
+    return Cellar.snapshot();
+  },
   openCoravin(id){ Cellar.update(id, { coravin:{ openedAt: Date.now() } }); },
   reseal(id){ Cellar.update(id, { coravin:null }); },
   finishBottle(id){ const w=Cellar.get(id); if(!w) return; const qty=(w.qty||1)-1; if(qty<=0){ Cellar.remove(id); } else { Cellar.update(id, { qty, coravin:null }); } },
@@ -151,13 +203,15 @@ function useCellar(){
 }
 
 // ---------- status logic ----------
-// Five clearly-defined bands across a wine's life, from the four window markers
+// Six clearly-defined bands across a wine's life, from the four window markers
 // drinkFrom <= peakFrom <= peakTo <= drinkTo:
-//   hold  - before drinkFrom ......... too young, keep cellaring
-//   early - drinkFrom..peakFrom ...... drinkable, still climbing to peak
-//   now   - peakFrom..peakTo ......... at peak, ideal to drink
-//   soon  - peakTo..drinkTo .......... past peak but in window, drink up
-//   past  - after drinkTo ............ beyond its window, likely too old
+//   hold  - before drinkFrom .................... too young, keep cellaring
+//   early - drinkFrom..peakFrom ................. drinkable, still climbing to peak
+//   peak  - in peak with > PEAK_TAIL yrs left ... at its best, plenty of runway
+//   now   - final PEAK_TAIL yrs of peak ......... still superb but window closing
+//   soon  - peakTo..drinkTo ..................... past peak, fading, drink up
+//   past  - after drinkTo ....................... beyond its window, likely too old
+const PEAK_TAIL = 2; // years left in the peak plateau before it becomes "drink now"
 function _num(x){ return (typeof x==="number" && isFinite(x)) ? x : null; }
 function windowMarkers(w){
   let df=_num(w.drinkFrom), pf=_num(w.peakFrom), pt=_num(w.peakTo), dt=_num(w.drinkTo);
@@ -177,10 +231,12 @@ function statusOf(w, year=THIS_YEAR){
   if(year > m.dt) return "past";     // beyond drink window - too old
   if(year < m.df) return "hold";     // before window - too young
   if(year < m.pf) return "early";    // in window, climbing to peak
-  if(year <= m.pt) return "now";     // at peak
+  if(year <= m.pt){                  // within the peak plateau
+    return (m.pt - year) <= PEAK_TAIL ? "now" : "peak"; // closing vs runway
+  }
   return "soon";                     // past peak, still drinkable - drink up
 }
-const STATUS_LABEL = { now:"Drink now", soon:"Drink soon", early:"Almost ready", hold:"Too young", past:"Past window" };
+const STATUS_LABEL = { peak:"At peak", now:"Drink now", soon:"Drink soon", early:"Almost ready", hold:"Too young", past:"Past window" };
 function statusLabel(w){
   const s = statusOf(w);
   const m = windowMarkers(w);
@@ -194,14 +250,16 @@ function statusSub(w){
   if(!m) return "";
   if(s==="hold") return "drink from " + m.df;
   if(s==="early") return "peak " + m.pf + "–" + m.pt;
-  if(s==="now") return "peak through " + m.pt;
+  if(s==="peak") return "peak through " + m.pt;
+  if(s==="now") return "peak ends " + m.pt;
   if(s==="soon") return "drink by " + m.dt;
   return "window closed " + m.dt;
 }
 // One-line plain-English guidance shown on the detail screen.
 function statusBlurb(w){
   const s = statusOf(w), m = windowMarkers(w);
-  if(s==="now") return "At its peak now — a great time to open.";
+  if(s==="peak") return m ? ("At its peak, with plenty of runway — enjoy any time through " + m.pt + ".") : "At its peak, with room to spare.";
+  if(s==="now") return m ? ("In the final stretch of its peak (through " + m.pt + ") — at its best now, so prioritise these.") : "At its peak now — a great time to open.";
   if(s==="soon") return "Past peak but still drinking well — drink up over the next year or two.";
   if(s==="early") return m ? ("Drinking well already; should keep improving toward its peak around " + m.pf + ".") : "Drinkable now, with room to improve.";
   if(s==="past") return "Likely past its drinking window — open soon if at all.";

@@ -25,24 +25,18 @@
   --serif:var(--sans);
   --mono:ui-monospace,'SF Mono',monospace;
   --safe-b:env(safe-area-inset-bottom,0px);
-  /* Safe-area insets. In a browser tab these are the raw env() values (0 when
-     there's no notch). When the app is installed (standalone) we guarantee a
-     minimum so the content always clears the iPad/iPhone status bar + home
-     indicator — iPadOS often reports 0 for the top inset even in standalone. */
-  --safe-top:env(safe-area-inset-top,0px);
+  /* Safe-area insets. The TOP always reserves enough room to clear a phone/iPad
+     status bar (iPadOS unreliably reports both env() and display-mode in
+     standalone, so we can't depend on detection) — max() means notched iPhones
+     still get their larger inset. Bottom only pads when actually installed. */
+  --safe-top:max(env(safe-area-inset-top,0px), 36px);
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --tabh:56px;
 }
 @media (display-mode:standalone){
-  :root{
-    --safe-top:max(env(safe-area-inset-top,0px), 24px);
-    --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px);
-  }
+  :root{ --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px); }
 }
-/* iOS-specific fallback: navigator.standalone sets this class (set in HTML).
-   Covers iPadOS standalone where display-mode/env() can both report wrong. */
 html.pwa-standalone{
-  --safe-top:max(env(safe-area-inset-top,0px), 24px);
   --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px);
 }
 
@@ -114,14 +108,15 @@ input,textarea{ font-family:inherit; color:inherit; }
 .chip-row::-webkit-scrollbar{ display:none; }
 
 /* status pills */
-.stat-pill{ display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600; padding:3px 9px; border-radius:6px; letter-spacing:.1px; }
-.st-now{ background:#e2f0e8; color:var(--green); }
+.stat-pill{ display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600; padding:3px 9px; border-radius:6px; letter-spacing:.1px; white-space:nowrap; }
+.st-peak{ background:#e2f0e8; color:var(--green); }
+.st-now{ background:#f4ead0; color:#946c16; }
 .st-early{ background:#dcefe9; color:#2f7d6b; }
-.st-soon{ background:#f5ead6; color:var(--amber); }
+.st-soon{ background:#f6e1cf; color:#b25f1c; }
 .st-hold{ background:#e8ebed; color:var(--slate); }
 .st-past{ background:#f3dadf; color:var(--red); }
-.dot{ width:6px; height:6px; border-radius:50%; }
-.dot.now{ background:var(--green);} .dot.early{ background:#2f7d6b;} .dot.soon{ background:var(--amber);} .dot.hold{ background:var(--slate);} .dot.past{ background:var(--red);}
+.dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.dot.peak{ background:var(--green);} .dot.now{ background:#946c16;} .dot.early{ background:#2f7d6b;} .dot.soon{ background:#b25f1c;} .dot.hold{ background:var(--slate);} .dot.past{ background:var(--red);}
 
 /* ----- Buttons ----- */
 .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:16px; padding:12px 18px; border-radius:10px; background:var(--card); border:1px solid var(--line2); }

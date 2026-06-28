@@ -34,7 +34,7 @@ function pairScore(w, rule, dish){
   if(rule.earthy && /nebbiolo|pinot/i.test(w.varietal||"")) score+=16;
   if(rule.sweetish && (w.sweetness||0)>12) score+=10;
   // prefer ready-to-drink
-  const s=statusOf(w); if(s==="now")score+=10; else if(s==="hold")score-=6;
+  const s=statusOf(w); if(s==="now"||s==="peak")score+=10; else if(s==="hold")score-=6;
   const label = score>=70?"Excellent":score>=50?"Great":score>=32?"Good":score>0?"Fair":null;
   return { score, label, why: reasons[0] || rule.why };
 }
