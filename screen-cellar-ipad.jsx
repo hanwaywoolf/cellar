@@ -47,7 +47,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
   const varietalOpts = uniqCounts(byClass, "varietal");
   const vintageOpts = [...new Set(byVarietal.map(w=>w.vintage).filter(Boolean))].sort((a,b)=>b-a)
     .map(y=>({ value:String(y), label:String(y), count: byVarietal.filter(w=>String(w.vintage)===String(y)).length }));
-  const statusOpts = [["now","Drink now"],["soon","Drink soon"],["hold","Hold"],["past","Past peak"]]
+  const statusOpts = [["now","Drink now"],["soon","Drink soon"],["early","Almost ready"],["hold","Too young"],["past","Past window"]]
     .map(([v,l])=>({ value:v, label:l, count: byVintage.filter(w=>statusOf(w)===v).length })).filter(o=>o.count>0);
   const storageOpts = STORAGE_AREAS.map(a=>({ value:a.id, label:a.label, count: byStatus.filter(w=>w.location&&w.location.area===a.id).reduce((s,w)=>s+(w.qty||1),0) })).filter(o=>o.count>0);
   const reviewerOpts = Object.keys(RATING_SOURCES).map(k=>({ value:k, label:k+" — "+RATING_SOURCES[k], count: byStorage.filter(w=>w.ratings&&w.ratings[k]!=null&&w.ratings[k]>0).length })).filter(o=>o.count>0);

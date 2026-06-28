@@ -73,14 +73,15 @@ const StatusPill = ({ w }) => {
 
 const DrinkMeter = ({ w }) => {
   const g = meterGeom(w);
-  if(!g) return null;
+  const m = (typeof windowMarkers!=="undefined") ? windowMarkers(w) : null;
+  if(!g || !m) return null;
   return (
     <div>
       <div className="meter">
         <div className="peak" style={{left:(g.peakL*100)+"%", width:((g.peakR-g.peakL)*100)+"%"}}/>
         <div className="now" style={{left:`calc(${g.now*100}% - 1.5px)`}}/>
       </div>
-      <div className="meter-axis"><span>{w.drinkFrom}</span><span className="gold" style={{fontWeight:700}}>peak {w.peakFrom}–{w.peakTo}</span><span>{w.drinkTo}</span></div>
+      <div className="meter-axis"><span>{m.df}</span><span className="gold" style={{fontWeight:700}}>peak {m.pf}–{m.pt}</span><span>{m.dt}</span></div>
     </div>
   );
 };

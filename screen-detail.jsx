@@ -7,6 +7,7 @@ function DetailScreen({ id, onClose }){
   const [openSheet, setOpenSheet] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [locSheet, setLocSheet] = React.useState(false);
+  const [winBusy, setWinBusy] = React.useState(false);
   if(!w){ return <div className="full-screen"><div className="empty">Wine not found.<br/><button className="btn" style={{marginTop:14}} onClick={onClose}>Back</button></div></div>; }
 
   const value = (w.valueEst||0);
@@ -46,7 +47,7 @@ function DetailScreen({ id, onClose }){
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10,marginBottom:16}}>
             <div className="card" style={{padding:"12px 8px",textAlign:"center"}}>
               <div style={{display:"grid",placeItems:"center",marginBottom:5}}><StatusPill w={w}/></div>
-              <div className="muted" style={{fontSize:11}}>{w.peakFrom&&statusOf(w)==="hold"?`peak ${w.peakFrom}`:`through ${w.drinkTo}`}</div>
+              <div className="muted" style={{fontSize:11}}>{statusSub(w)}</div>
             </div>
             <div className="card" style={{padding:"12px 8px",textAlign:"center"}}>
               <div className="num wine-c" style={{fontSize:22}}>{fmt$(value)}</div>
@@ -85,9 +86,13 @@ function DetailScreen({ id, onClose }){
           <div className="section-label" style={{marginBottom:9}}>Drink window</div>
           <div className="card" style={{padding:"15px 15px",marginBottom:16}}>
             <DrinkMeter w={w}/>
-            {w.peakFrom && <div style={{marginTop:11,fontSize:13.5,lineHeight:1.5}} className="muted">
-              {statusOf(w)==="now"?"At its peak now — a great time to open.":statusOf(w)==="soon"?"Drink up over the next year or two.":statusOf(w)==="past"?"Past its prime — open soon if at all.":`Best left to age; opens up around ${w.peakFrom}.`}
+            {windowMarkers(w) && <div style={{marginTop:11,fontSize:13.5,lineHeight:1.5}} className="muted">
+              {statusBlurb(w)}
             </div>}
+            <button className="btn ghost block" style={{marginTop:12,fontSize:12.5}} disabled={winBusy}
+              onClick={async()=>{ setWinBusy(true); try{ await refreshWindow(w.id); }catch(e){ alert(e.message); } setWinBusy(false); }}>
+              <Ico n="refresh" s={14}/>{winBusy?"Re-assessing…":"Re-assess drink window with AI"}
+            </button>
           </div>
 
           {/* critic ratings */}

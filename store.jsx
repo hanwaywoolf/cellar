@@ -151,20 +151,61 @@ function useCellar(){
 }
 
 // ---------- status logic ----------
-function statusOf(w, year=THIS_YEAR){
-  if(w.drinkTo && year > w.drinkTo) return "past";
-  if(w.peakFrom && w.peakTo && year >= w.peakFrom && year <= w.peakTo) return "now";
-  if(w.peakFrom && year < w.peakFrom){
-    return (w.drinkFrom && year >= w.drinkFrom) ? "soon" : "hold";
-  }
-  if(w.peakTo && year > w.peakTo) return "soon"; // past peak but drinkable → drink up
-  return "hold";
+// Five clearly-defined bands across a wine's life, from the four window markers
+// drinkFrom <= peakFrom <= peakTo <= drinkTo:
+//   hold  - before drinkFrom ......... too young, keep cellaring
+//   early - drinkFrom..peakFrom ...... drinkable, still climbing to peak
+//   now   - peakFrom..peakTo ......... at peak, ideal to drink
+//   soon  - peakTo..drinkTo .......... past peak but in window, drink up
+//   past  - after drinkTo ............ beyond its window, likely too old
+function _num(x){ return (typeof x==="number" && isFinite(x)) ? x : null; }
+function windowMarkers(w){
+  let df=_num(w.drinkFrom), pf=_num(w.peakFrom), pt=_num(w.peakTo), dt=_num(w.drinkTo);
+  if(df==null && pf==null && pt==null && dt==null) return null; // no window data
+  // Fill gaps from whatever markers exist so partial data still classifies.
+  if(pf==null) pf = (df!=null?df:(pt!=null?pt:dt));
+  if(pt==null) pt = (dt!=null?dt:pf);
+  if(df==null) df = pf;
+  if(dt==null) dt = pt;
+  // Enforce monotonic order so a mis-estimated set still behaves sanely.
+  pf = Math.max(df, pf); pt = Math.max(pf, pt); dt = Math.max(pt, dt);
+  return { df, pf, pt, dt };
 }
-const STATUS_LABEL = { now:"Drink now", soon:"Drink soon", hold:"Hold", past:"Past peak" };
+function statusOf(w, year=THIS_YEAR){
+  const m = windowMarkers(w);
+  if(!m) return "hold";              // unknown window -> hold
+  if(year > m.dt) return "past";     // beyond drink window - too old
+  if(year < m.df) return "hold";     // before window - too young
+  if(year < m.pf) return "early";    // in window, climbing to peak
+  if(year <= m.pt) return "now";     // at peak
+  return "soon";                     // past peak, still drinkable - drink up
+}
+const STATUS_LABEL = { now:"Drink now", soon:"Drink soon", early:"Almost ready", hold:"Too young", past:"Past window" };
 function statusLabel(w){
   const s = statusOf(w);
-  if(s==="hold" && w.peakFrom) return `Hold → ${w.peakFrom}`;
+  const m = windowMarkers(w);
+  if(s==="hold" && m) return "Hold → " + m.df;
+  if(s==="early" && m) return "Drink · peaks " + m.pf;
   return STATUS_LABEL[s];
+}
+// Short subtitle for the status tile (e.g. "drink by 2030").
+function statusSub(w){
+  const s = statusOf(w), m = windowMarkers(w);
+  if(!m) return "";
+  if(s==="hold") return "drink from " + m.df;
+  if(s==="early") return "peak " + m.pf + "–" + m.pt;
+  if(s==="now") return "peak through " + m.pt;
+  if(s==="soon") return "drink by " + m.dt;
+  return "window closed " + m.dt;
+}
+// One-line plain-English guidance shown on the detail screen.
+function statusBlurb(w){
+  const s = statusOf(w), m = windowMarkers(w);
+  if(s==="now") return "At its peak now — a great time to open.";
+  if(s==="soon") return "Past peak but still drinking well — drink up over the next year or two.";
+  if(s==="early") return m ? ("Drinking well already; should keep improving toward its peak around " + m.pf + ".") : "Drinkable now, with room to improve.";
+  if(s==="past") return "Likely past its drinking window — open soon if at all.";
+  return m ? ("Too young — best left to age until around " + m.df + ".") : "Best left to age a while longer.";
 }
 function windowText(w){
   if(!w.drinkFrom) return "—";
@@ -172,12 +213,13 @@ function windowText(w){
 }
 // position 0..1 of "now" across the drink window, + peak band
 function meterGeom(w){
-  const a=w.drinkFrom, b=w.drinkTo; if(!a||!b||b<=a) return null;
+  const m = windowMarkers(w); if(!m) return null;
+  const a=m.df, b=m.dt; if(b<=a) return null;
   const clamp=v=>Math.max(0,Math.min(1,v));
   return {
     now: clamp((THIS_YEAR-a)/(b-a)),
-    peakL: clamp((w.peakFrom-a)/(b-a)),
-    peakR: clamp((w.peakTo-a)/(b-a)),
+    peakL: clamp((m.pf-a)/(b-a)),
+    peakR: clamp((m.pt-a)/(b-a)),
   };
 }
 const fmt$ = n => n==null ? "\u2014" : CURRENCY.symbol + Math.round(n).toLocaleString();
@@ -212,7 +254,7 @@ function coravinText(w){
 async function identifyFromText(ocrText){
   const prompt = `You are a master sommelier and wine database. Text was OCR-scanned from a wine bottle label (it may be messy, partial, or contain noise). Identify the wine and return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
 {"producer":string,"cuvee":string,"vintage":number,"color":"Red"|"White"|"Rosé"|"Sparkling","country":string,"region":string,"subregion":string,"appellation":string,"classification":string,"varietal":string,"abv":number,"critScore":number,"drinkFrom":number,"drinkTo":number,"peakFrom":number,"peakTo":number,"valueLow":number,"valueHigh":number,"valueEst":number,"pairings":string[],"tasting":string,"body":number,"tannin":number,"acidity":number,"sweetness":number,"ratings":{"RP":number|null,"JS":number|null,"WS":number|null,"AG":number|null,"JR":number|null,"D":number|null,"WE":number|null},"confidence":number}
-Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in GBP (British pounds sterling) — valueLow, valueHigh and valueEst must all be GBP amounts, not USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for unknown. critScore = the single highest score. confidence 0-100 = how sure you are of the identification. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.
+Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in GBP (British pounds sterling) — valueLow, valueHigh and valueEst must all be GBP amounts, not USD. drinkFrom/peakFrom/peakTo/drinkTo are 4-digit years and MUST satisfy drinkFrom <= peakFrom <= peakTo <= drinkTo. Base the window on this exact producer+cuvee+vintage and its real ageing curve — be rigorous and honest, never inflate longevity. drinkFrom = when it first drinks well; peakFrom..peakTo = the prime plateau; drinkTo = the realistic end of its drinking life, after which it is likely past its best. CRUCIAL: for older vintages the window may already have CLOSED — if the wine is past its drinking life, set drinkTo to the (past) year it realistically faded; never extend the window just because a bottle still exists. Everyday/early-drinking wines get short windows of a few years; only genuinely age-worthy wines (top Bordeaux, Barolo, Rioja Gran Reserva, vintage Port, etc.) get multi-decade windows. pairings = 3-5 specific foods. tasting = one vivid sentence. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for unknown. critScore = the single highest score. confidence 0-100 = how sure you are of the identification. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.
 
 OCR TEXT:
 """${ocrText.slice(0,1200)}"""`;
@@ -266,7 +308,7 @@ async function identifyFromImage(imageDataUrl){
   const data = m[2] || (imageDataUrl.split(",")[1] || imageDataUrl);
   const instruction = `You are a master sommelier with an encyclopedic wine database. Study this photo of a wine bottle label and identify the wine. Read every legible word — including small print, foil/gold lettering, and embossed or low-contrast text. Use producer logos and visual cues. Then return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
 ${WINE_SCHEMA}
-Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in GBP (British pounds sterling) — valueLow, valueHigh and valueEst must all be GBP amounts, not USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. labelText = the exact words you can read on the label, comma-separated. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker/Wine Advocate, JS=James Suckling, WS=Wine Spectator, AG=Antonio Galloni/Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for any you don't know — only include scores you're confident about. critScore = the single highest/most authoritative score. confidence 0-100 = how sure you are of the identification. If the producer or wine is unclear, still give your best expert guess and lower the confidence. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.`;
+Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in GBP (British pounds sterling) — valueLow, valueHigh and valueEst must all be GBP amounts, not USD. drinkFrom/peakFrom/peakTo/drinkTo are 4-digit years and MUST satisfy drinkFrom <= peakFrom <= peakTo <= drinkTo. Base the window on this exact producer+cuvee+vintage and its real ageing curve — be rigorous and honest, never inflate longevity. drinkFrom = when it first drinks well; peakFrom..peakTo = the prime plateau; drinkTo = the realistic end of its drinking life, after which it is likely past its best. CRUCIAL: for older vintages the window may already have CLOSED — if the wine is past its drinking life, set drinkTo to the (past) year it realistically faded; never extend the window just because a bottle still exists. Everyday/early-drinking wines get short windows of a few years; only genuinely age-worthy wines (top Bordeaux, Barolo, Rioja Gran Reserva, vintage Port, etc.) get multi-decade windows. pairings = 3-5 specific foods. tasting = one vivid sentence. labelText = the exact words you can read on the label, comma-separated. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker/Wine Advocate, JS=James Suckling, WS=Wine Spectator, AG=Antonio Galloni/Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for any you don't know — only include scores you're confident about. critScore = the single highest/most authoritative score. confidence 0-100 = how sure you are of the identification. If the producer or wine is unclear, still give your best expert guess and lower the confidence. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.`;
   const raw = await window.claude.complete({ messages:[{ role:"user", content:[
     { type:"image", source:{ type:"base64", media_type, data } },
     { type:"text", text:instruction }
@@ -299,4 +341,30 @@ RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Rob
   return ratings;
 }
 
-Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, STATUS_LABEL, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });
+// Re-assess the drink window for a wine already in the cellar (text-only, no image)
+async function refreshWindow(id){
+  if(!window.claude || !window.claude.complete) throw new Error("AI service not connected.");
+  const w = Cellar.get(id);
+  if(!w) throw new Error("Wine not found.");
+  const prompt = `You are a master sommelier with deep knowledge of wine ageing curves. Assess the realistic drinking window for this exact wine and return ONLY a JSON object (no markdown):
+Producer: ${w.producer}
+Cuvée: ${w.cuvee||""}
+Vintage: ${w.vintage||"NV"}
+Colour: ${w.color||""}
+Varietal: ${w.varietal||""}
+Region: ${w.region||""}, ${w.country||""}
+Classification: ${w.classification||""}
+
+Keys: {"drinkFrom":number,"peakFrom":number,"peakTo":number,"drinkTo":number}
+All four are 4-digit years and MUST satisfy drinkFrom <= peakFrom <= peakTo <= drinkTo. drinkFrom = when it first drinks well; peakFrom..peakTo = the prime plateau; drinkTo = the realistic end of its drinking life. Be rigorous and honest about this exact producer+cuvée+vintage — never inflate longevity. CRUCIAL: for older vintages the window may already have CLOSED; if so, set drinkTo to the (past) year it realistically faded. Everyday wines get short windows; only genuinely age-worthy wines get multi-decade windows. Today is ${THIS_YEAR}.`;
+  const raw = await window.claude.complete(prompt);
+  let obj;
+  try{ const m=raw.match(/\{[\s\S]*\}/); obj=JSON.parse(m?m[0]:raw); }catch(e){ throw new Error("Couldn't read the drink window."); }
+  const patch = {};
+  ["drinkFrom","peakFrom","peakTo","drinkTo"].forEach(k=>{ const v=Number(obj[k]); if(isFinite(v)&&v>1900&&v<2200) patch[k]=v; });
+  if(!patch.drinkTo && !patch.peakTo) throw new Error("Couldn't read the drink window.");
+  Cellar.update(id, patch);
+  return patch;
+}
+
+Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });

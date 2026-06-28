@@ -35,6 +35,7 @@ function DetailPanel({ id, onClose }){
   const [openSheet, setOpenSheet] = React.useState(false);
   const [refreshing, setRefreshing] = React.useState(false);
   const [locSheet, setLocSheet] = React.useState(false);
+  const [winBusy, setWinBusy] = React.useState(false);
 
   if(!w) return (
     <aside className="detail-panel">
@@ -80,7 +81,7 @@ function DetailPanel({ id, onClose }){
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:14}}>
             <div className="card" style={{padding:"10px 6px",textAlign:"center"}}>
               <div style={{display:"grid",placeItems:"center",marginBottom:4}}><StatusPill w={w}/></div>
-              <div className="muted" style={{fontSize:10.5}}>{w.peakFrom&&statusOf(w)==="hold"?`peak ${w.peakFrom}`:`through ${w.drinkTo}`}</div>
+              <div className="muted" style={{fontSize:10.5}}>{statusSub(w)}</div>
             </div>
             <div className="card" style={{padding:"10px 6px",textAlign:"center"}}>
               <div className="num wine-c" style={{fontSize:20}}>{fmt$(value)}</div>
@@ -118,9 +119,13 @@ function DetailPanel({ id, onClose }){
           <div className="section-label" style={{marginBottom:8}}>Drink window</div>
           <div className="card" style={{padding:"14px 14px",marginBottom:14}}>
             <DrinkMeter w={w}/>
-            {w.peakFrom && <div style={{marginTop:9,fontSize:12.5,lineHeight:1.5}} className="muted">
-              {statusOf(w)==="now"?"At its peak — a great time to open.":statusOf(w)==="soon"?"Drink up soon.":statusOf(w)==="past"?"Past its prime — open soon if at all.":`Best left to age until around ${w.peakFrom}.`}
+            {windowMarkers(w) && <div style={{marginTop:9,fontSize:12.5,lineHeight:1.5}} className="muted">
+              {statusBlurb(w)}
             </div>}
+            <button className="btn ghost block" style={{marginTop:11,fontSize:12}} disabled={winBusy}
+              onClick={async()=>{ setWinBusy(true); try{ await refreshWindow(w.id); }catch(e){ alert(e.message); } setWinBusy(false); }}>
+              <Ico n="refresh" s={13}/>{winBusy?"Re-assessing…":"Re-assess drink window with AI"}
+            </button>
           </div>
 
           {/* critic ratings */}
