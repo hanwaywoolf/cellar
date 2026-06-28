@@ -104,6 +104,7 @@ function ScanScreen({ start="camera", onClose, onAdded }){
     ["vintage","abv","critScore","drinkFrom","drinkTo","peakFrom","peakTo","valueLow","valueHigh","valueEst","body","tannin","acidity","sweetness"]
       .forEach(k=>{ if(w[k]!==null&&w[k]!=="") w[k]=Number(w[k]); });
     const item = Cellar.addOrMerge(w, qty);
+    window.BackupManager?.recordScan?.();
     onAdded && onAdded(item.id);
   }
 

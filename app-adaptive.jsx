@@ -84,6 +84,7 @@ function IPadAppInner(){
           {tab==="tonight" && <TonightScreen onOpen={(id)=>{setTab("cellar");setDetailId(id);}}/>}
           {tab==="pairing" && <PairingScreen onOpen={(id)=>{setTab("cellar");setDetailId(id);}}/>}
           {tab==="stats" && <StatsScreen onDrill={drillTo}/>}
+          {tab==="backup" && <BackupScreen/>}
         </div>
       </main>
 

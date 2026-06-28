@@ -2,6 +2,39 @@
 
 const THIS_YEAR = 2026;
 const LS_KEY = "cellar_wines_v2";
+const SCHEMA_VERSION = 2; // bump this when the wine object shape changes
+
+// ---------- migration ----------
+// Each step takes the wines array and returns an upgraded copy.
+// Add a new case for every schema change; never delete old cases.
+function migrateWines(wines, fromVersion){
+  let v = fromVersion || 1;
+  let ws = wines.map(function(w){ return Object.assign({}, w); }); // shallow-clone all
+
+  // v1 -> v2: ensure qty, addedAt, photo exist; flatten legacy nested fields
+  if(v < 2){
+    ws = ws.map(function(w){
+      if(w.qty == null) w.qty = 1;
+      if(!w.addedAt) w.addedAt = Date.now();
+      if(w.photo === undefined) w.photo = null;
+      return w;
+    });
+    v = 2;
+  }
+
+  // v2 -> v3 example (uncomment + bump SCHEMA_VERSION when needed):
+  // if(v < 3){
+  //   ws = ws.map(function(w){
+  //     // e.g. rename w.rack -> w.location.slot
+  //     if(w.rack != null && !w.location) w.location = { slot: w.rack };
+  //     delete w.rack;
+  //     return w;
+  //   });
+  //   v = 3;
+  // }
+
+  return ws;
+}
 
 // ---------- backup ----------
 const AUTO_BACKUP_LS = "cellar_auto_bk";
@@ -54,6 +87,7 @@ const Cellar = {
   update(id, patch){ _wines = load().map(w=> w.id===id ? {...w, ...patch} : w); persist(); },
   setQty(id, qty){ qty=Math.max(0,qty); if(qty===0){ Cellar.remove(id); return; } Cellar.update(id,{qty}); },
   remove(id){ _wines = load().filter(w=>w.id!==id); persist(); },
+  _restore(wines){ _wines = wines; persist(); },
   openCoravin(id){ Cellar.update(id, { coravin:{ openedAt: Date.now() } }); },
   reseal(id){ Cellar.update(id, { coravin:null }); },
   finishBottle(id){ const w=Cellar.get(id); if(!w) return; const qty=(w.qty||1)-1; if(qty<=0){ Cellar.remove(id); } else { Cellar.update(id, { qty, coravin:null }); } },
@@ -81,6 +115,8 @@ const Cellar = {
   getAutoBackup(){ return _autoBackup; },
   setAutoBackup(on){ _autoBackup=!!on; try{ localStorage.setItem(AUTO_BACKUP_LS,String(_autoBackup)); }catch(e){} },
   scheduleAutoBackup(){
+    // now handled by BackupManager.recordScan() — kept for legacy callers
+    if(window.BackupManager) return; // defer to new system
     if(!_autoBackup) return;
     clearTimeout(_bkTimer);
     _bkTimer=setTimeout(()=>Cellar.exportBackup(),3000);
@@ -243,4 +279,4 @@ RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Rob
   return ratings;
 }
 
-Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, STATUS_LABEL, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR });
+Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, STATUS_LABEL, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });

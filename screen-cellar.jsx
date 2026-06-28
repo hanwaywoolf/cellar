@@ -330,7 +330,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
       {picker==="reviewer" && <Picker title="Reviewed by" sub="Show wines scored by a specific critic" options={reviewerOpts} current={reviewer} onClose={()=>setPicker(null)} onPick={setReviewer}/>}
       {picker==="sort" && <Picker title="Sort by" options={Object.entries(SORTS).map(([k,v])=>({value:k,label:v.label,count:""}))} current={sort} onClose={()=>setPicker(null)} onPick={setSort}/>}
       {picker==="slots" && <SlotSettings slots={listSlots} onChange={setListSlots} onClose={()=>setPicker(null)}/>}
-      {showBackup && <BackupSheet onClose={()=>setShowBackup(false)}/>}
+      {showBackup && <BackupScreen onClose={()=>setShowBackup(false)}/>}
     </>
   );
 }

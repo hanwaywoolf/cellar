@@ -5,10 +5,11 @@ const EMPTY_FILTERS = { color:"All", country:null, region:null, cls:null, variet
 /* ---- Sidebar ---- */
 function Sidebar({ tab, setTab, onScan }){
   const NAV = [
-    { id:"cellar", icon:"cellar", label:"Cellar" },
-    { id:"tonight", icon:"glass", label:"Tonight" },
-    { id:"pairing", icon:"fork", label:"Pair" },
-    { id:"stats", icon:"chart", label:"Stats" },
+    { id:"cellar",  icon:"cellar",   label:"Cellar"  },
+    { id:"tonight", icon:"glass",    label:"Tonight" },
+    { id:"pairing", icon:"fork",     label:"Pair"    },
+    { id:"stats",   icon:"chart",    label:"Stats"   },
+    { id:"backup",  icon:"download", label:"Backup"  },
   ];
   return (
     <nav className="sidebar">
@@ -18,7 +19,7 @@ function Sidebar({ tab, setTab, onScan }){
           <Ico n={n.icon} s={22}/>{n.label}
         </button>
       ))}
-      <div className="spacer"/>
+      <div style={{flex:1}}/>
       <button className="scan-btn" onClick={onScan} title="Scan a label">
         <Ico n="camera" s={24}/>
       </button>
@@ -186,7 +187,7 @@ function DetailPanel({ id, onClose }){
       </div>
 
       {/* action bar */}
-      <div style={{borderTop:"1px solid var(--line2)",background:"var(--bg)",padding:"14px 20px",display:"flex",gap:12,alignItems:"center"}}>
+      <div className="detail-action-bar" style={{borderTop:"1px solid var(--line2)",background:"var(--bg)",padding:"14px 20px",display:"flex",gap:12,alignItems:"center"}}>
         <div style={{display:"flex",flexDirection:"column",gap:3}}>
           <span className="section-label" style={{fontSize:9}}>Bottles</span>
           <QtyStepper value={w.qty} onChange={v=>Cellar.setQty(w.id, v)} min={0}/>

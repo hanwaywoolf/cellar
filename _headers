@@ -16,6 +16,10 @@
 # App source files
 /store.jsx
   Cache-Control: no-cache
+/backup.jsx
+  Cache-Control: no-cache
+/screen-backup.jsx
+  Cache-Control: no-cache
 /ui.jsx
   Cache-Control: no-cache
 /claude-bridge.js

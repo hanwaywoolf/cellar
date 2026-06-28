@@ -155,18 +155,18 @@ function DetailScreen({ id, onClose }){
       </div>
 
       {/* action bar */}
-      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 32%)",padding:"20px 18px calc(env(safe-area-inset-bottom,0) + 16px)",display:"flex",gap:12,alignItems:"center"}}>
+      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 32%)",padding:"20px 18px calc(env(safe-area-inset-bottom,0) + 16px)",display:"flex",gap:12,alignItems:"flex-end"}}>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
           <span className="section-label">Bottles</span>
           <QtyStepper value={w.qty} onChange={v=>Cellar.setQty(w.id, v)} min={0}/>
         </div>
         {cor ? (
-          <button className="btn primary block" style={{flex:1}} onClick={finishCoravin}>
-            <Ico n="glass" s={18}/>Finish the bottle
+          <button className="btn primary" style={{flex:1,height:40,padding:"0 16px",fontSize:15}} onClick={finishCoravin}>
+            <Ico n="glass" s={17}/>Finish the bottle
           </button>
         ) : (
-          <button className="btn primary block" style={{flex:1}} onClick={()=>setOpenSheet(true)}>
-            <Ico n="bottle" s={18}/>Open a bottle
+          <button className="btn primary" style={{flex:1,height:40,padding:"0 16px",fontSize:15}} onClick={()=>setOpenSheet(true)}>
+            <Ico n="bottle" s={17}/>Open a bottle
           </button>
         )}
       </div>
