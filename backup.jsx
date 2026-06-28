@@ -54,7 +54,7 @@ async function _gSignIn(clientId){
         resolve();
       }
     });
-    client.requestAccessToken({ prompt:"" });
+    client.requestAccessToken({ prompt:"select_account" });
   });
 }
 
