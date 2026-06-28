@@ -133,13 +133,13 @@ function ScanScreen({ start="camera", onClose, onAdded }){
             </svg>
           </div>
           {/* top bar */}
-          <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"calc(env(safe-area-inset-top,0) + 14px) 16px"}}>
+          <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"calc(var(--safe-top) + 14px) 16px"}}>
             <button className="icon-btn" onClick={()=>{stopCam();onClose();}}><Ico n="x" s={20}/></button>
             <span style={{color:"#f3ece0",fontSize:13,fontWeight:600,background:"rgba(0,0,0,.35)",padding:"6px 12px",borderRadius:20,whiteSpace:"nowrap"}}>Scan a label</span>
             <div style={{width:42}}/>
           </div>
           {/* controls */}
-          <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",alignItems:"flex-end",justifyContent:"space-around",padding:"20px 24px calc(env(safe-area-inset-bottom,0) + 22px)"}}>
+          <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",alignItems:"flex-end",justifyContent:"space-around",padding:"20px 24px calc(var(--safe-bottom) + 22px)"}}>
             <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,width:64}}>
               <button className="icon-btn" style={{background:"rgba(255,253,249,.16)",border:"none",color:"#f3ece0"}} onClick={()=>fileRef.current.click()}><Ico n="image" s={22}/></button>
               <span style={{color:"#f3ece0",fontSize:10.5,opacity:.75}}>Upload</span>

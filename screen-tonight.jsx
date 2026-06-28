@@ -8,12 +8,11 @@ const FOODS = Object.keys(FOOD_PREF);
 
 function scoreWine(w, ctx){
   const s = statusOf(w);
-  let score = ({peak:56, now:55, soon:40, early:22, past:14, hold:-12})[s] || 0;
+  let score = ({now:55, soon:40, early:22, past:14, hold:-12})[s] || 0;
   const reasons = [];
-  if(s==="peak"){ reasons.push("at its peak"); }
-  else if(s==="now"){ reasons.push("at its peak now"); }
+  if(s==="now"){ reasons.push("at its peak now"); }
   else if(s==="soon"){ reasons.push("drink-soon window"); }
-  else if(s==="early"){ reasons.push("drinking well already"); }
+  else if(s==="early"){ reasons.push("approaching its peak"); }
   else if(s==="past"){ reasons.push("use it up"); }
 
   // food

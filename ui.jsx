@@ -82,7 +82,7 @@ const DrinkMeter = ({ w }) => {
         <div className="peak" style={{left:(g.peakL*100)+"%", width:((g.peakR-g.peakL)*100)+"%"}}/>
         <div className="now" style={{left:`calc(${g.now*100}% - 1.5px)`}}/>
       </div>
-      <div className="meter-axis"><span>{m.df}</span><span className="gold" style={{fontWeight:700}}>peak {m.pf}–{m.pt}</span><span>{m.dt}</span></div>
+      <div className="meter-axis"><span>{m.df}</span><span className="gold" style={{fontWeight:700}}>peak {g.coreStart}–{g.coreEnd}</span><span>{m.dt}</span></div>
     </div>
   );
 };

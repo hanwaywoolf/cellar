@@ -23,9 +23,9 @@ function StatsScreen({ onDrill }){
   const gain = cost? Math.round(((value-cost)/cost)*100):null;
   const avg = bottles? value/bottles : 0;
 
-  const byStatus = { peak:0, now:0, soon:0, early:0, hold:0, past:0 };
+  const byStatus = { now:0, soon:0, early:0, hold:0, past:0 };
   wines.forEach(w=> byStatus[statusOf(w)] += (w.qty||1));
-  const ready = byStatus.now + byStatus.soon + byStatus.peak;
+  const ready = byStatus.now + byStatus.soon;
 
   function agg(key, byValue=false){
     const m=new Map();

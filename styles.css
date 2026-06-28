@@ -29,7 +29,7 @@
      status bar (iPadOS unreliably reports both env() and display-mode in
      standalone, so we can't depend on detection) — max() means notched iPhones
      still get their larger inset. Bottom only pads when actually installed. */
-  --safe-top:max(env(safe-area-inset-top,0px), 36px);
+  --safe-top:max(env(safe-area-inset-top,0px), 44px);
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --tabh:56px;
 }
@@ -38,6 +38,15 @@
 }
 html.pwa-standalone{
   --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px);
+}
+/* Solid status-bar band: paints the safe-area strip in the brand colour across
+   the full width so the clock/date sits on its own bar and the app clearly
+   begins below it — the native look. Always on (the app is used installed). */
+body::before{
+  content:""; position:fixed; top:0; left:0; right:0;
+  height:var(--safe-top);
+  background:var(--wine2);
+  z-index:55; pointer-events:none;
 }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -62,7 +71,7 @@ input,textarea{ font-family:inherit; color:inherit; }
 .topbar{
   position:sticky; top:0; z-index:20;
   display:flex; align-items:center; justify-content:space-between; gap:10px;
-  padding:calc(env(safe-area-inset-top,0px) + 14px) 18px 12px;
+  padding:calc(var(--safe-top) + 14px) 18px 12px;
   background:var(--bg);
 }
 .topbar h1{ font-weight:600; font-size:28px; line-height:1.1; margin:0; letter-spacing:-.3px; }
@@ -109,14 +118,13 @@ input,textarea{ font-family:inherit; color:inherit; }
 
 /* status pills */
 .stat-pill{ display:inline-flex; align-items:center; gap:5px; font-size:13px; font-weight:600; padding:3px 9px; border-radius:6px; letter-spacing:.1px; white-space:nowrap; }
-.st-peak{ background:#e2f0e8; color:var(--green); }
-.st-now{ background:#f4ead0; color:#946c16; }
+.st-now{ background:#e2f0e8; color:var(--green); }
 .st-early{ background:#dcefe9; color:#2f7d6b; }
 .st-soon{ background:#f6e1cf; color:#b25f1c; }
 .st-hold{ background:#e8ebed; color:var(--slate); }
 .st-past{ background:#f3dadf; color:var(--red); }
 .dot{ width:6px; height:6px; border-radius:50%; flex-shrink:0; }
-.dot.peak{ background:var(--green);} .dot.now{ background:#946c16;} .dot.early{ background:#2f7d6b;} .dot.soon{ background:#b25f1c;} .dot.hold{ background:var(--slate);} .dot.past{ background:var(--red);}
+.dot.now{ background:var(--green);} .dot.early{ background:#2f7d6b;} .dot.soon{ background:#b25f1c;} .dot.hold{ background:var(--slate);} .dot.past{ background:var(--red);}
 
 /* ----- Buttons ----- */
 .btn{ display:inline-flex; align-items:center; justify-content:center; gap:8px; font-weight:600; font-size:16px; padding:12px 18px; border-radius:10px; background:var(--card); border:1px solid var(--line2); }
@@ -168,7 +176,7 @@ textarea.field{ resize:none; line-height:1.5; }
 
 /* sheets / modal */
 .sheet-scrim{ position:fixed; inset:0; z-index:60; background:rgba(26,29,35,.38); display:flex; align-items:flex-end; justify-content:center; }
-.sheet{ width:100%; max-width:440px; max-height:88dvh; overflow-y:auto; background:var(--bg); border-radius:14px 14px 0 0; padding-bottom:env(safe-area-inset-bottom,0); }
+.sheet{ width:100%; max-width:440px; max-height:88dvh; overflow-y:auto; background:var(--bg); border-radius:14px 14px 0 0; padding-bottom:var(--safe-bottom); }
 .sheet::-webkit-scrollbar{ display:none; }
 .sheet .grab{ width:36px; height:4px; border-radius:30px; background:var(--line2); margin:8px auto 2px; }
 .full-screen{ position:fixed; top:0; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:440px; z-index:60; background:var(--bg); display:flex; flex-direction:column; }

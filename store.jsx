@@ -211,57 +211,59 @@ function useCellar(){
 //   now   - final PEAK_TAIL yrs of peak ......... still superb but window closing
 //   soon  - peakTo..drinkTo ..................... past peak, fading, drink up
 //   past  - after drinkTo ....................... beyond its window, likely too old
-const PEAK_TAIL = 2; // years left in the peak plateau before it becomes "drink now"
+// optimal core = the central third of the peak plateau. Inside it the wine is at
+// its true best ("drink now"); before it the wine is "approaching" (waiting still
+// improves it); after it the wine is "fading" (past optimal, drink up).
 function _num(x){ return (typeof x==="number" && isFinite(x)) ? x : null; }
 function windowMarkers(w){
   let df=_num(w.drinkFrom), pf=_num(w.peakFrom), pt=_num(w.peakTo), dt=_num(w.drinkTo);
   if(df==null && pf==null && pt==null && dt==null) return null; // no window data
-  // Fill gaps from whatever markers exist so partial data still classifies.
   if(pf==null) pf = (df!=null?df:(pt!=null?pt:dt));
   if(pt==null) pt = (dt!=null?dt:pf);
   if(df==null) df = pf;
   if(dt==null) dt = pt;
-  // Enforce monotonic order so a mis-estimated set still behaves sanely.
   pf = Math.max(df, pf); pt = Math.max(pf, pt); dt = Math.max(pt, dt);
   return { df, pf, pt, dt };
+}
+// Central "optimal" band of the peak plateau, plus its midpoint year.
+function peakCore(m){
+  const span = Math.max(0, m.pt - m.pf);
+  const off = span/3;                 // middle third is the true optimal
+  return { cs: m.pf + off, ce: m.pt - off, mid: Math.round((m.pf + m.pt)/2) };
 }
 function statusOf(w, year=THIS_YEAR){
   const m = windowMarkers(w);
   if(!m) return "hold";              // unknown window -> hold
   if(year > m.dt) return "past";     // beyond drink window - too old
   if(year < m.df) return "hold";     // before window - too young
-  if(year < m.pf) return "early";    // in window, climbing to peak
-  if(year <= m.pt){                  // within the peak plateau
-    return (m.pt - year) <= PEAK_TAIL ? "now" : "peak"; // closing vs runway
-  }
-  return "soon";                     // past peak, still drinkable - drink up
+  const c = peakCore(m);
+  if(year < c.cs) return "early";    // approaching peak - waiting still improves it
+  if(year <= c.ce) return "now";     // at its optimal peak - drink now
+  return "soon";                     // past optimal, fading - drink up
 }
-const STATUS_LABEL = { peak:"At peak", now:"Drink now", soon:"Drink soon", early:"Almost ready", hold:"Too young", past:"Past window" };
+const STATUS_LABEL = { now:"Drink now", soon:"Drink soon", early:"Approaching", hold:"Too young", past:"Past window" };
 function statusLabel(w){
   const s = statusOf(w);
   const m = windowMarkers(w);
   if(s==="hold" && m) return "Hold → " + m.df;
-  if(s==="early" && m) return "Drink · peaks " + m.pf;
+  if(s==="early" && m) return "Peaks ~" + peakCore(m).mid;
   return STATUS_LABEL[s];
 }
-// Short subtitle for the status tile (e.g. "drink by 2030").
 function statusSub(w){
   const s = statusOf(w), m = windowMarkers(w);
   if(!m) return "";
+  const c = peakCore(m);
   if(s==="hold") return "drink from " + m.df;
-  if(s==="early") return "peak " + m.pf + "–" + m.pt;
-  if(s==="peak") return "peak through " + m.pt;
-  if(s==="now") return "peak ends " + m.pt;
+  if(s==="early") return "peaks ~" + c.mid;
+  if(s==="now") return "peak " + Math.round(c.cs) + "–" + Math.round(c.ce);
   if(s==="soon") return "drink by " + m.dt;
   return "window closed " + m.dt;
 }
-// One-line plain-English guidance shown on the detail screen.
 function statusBlurb(w){
-  const s = statusOf(w), m = windowMarkers(w);
-  if(s==="peak") return m ? ("At its peak, with plenty of runway — enjoy any time through " + m.pt + ".") : "At its peak, with room to spare.";
-  if(s==="now") return m ? ("In the final stretch of its peak (through " + m.pt + ") — at its best now, so prioritise these.") : "At its peak now — a great time to open.";
-  if(s==="soon") return "Past peak but still drinking well — drink up over the next year or two.";
-  if(s==="early") return m ? ("Drinking well already; should keep improving toward its peak around " + m.pf + ".") : "Drinkable now, with room to improve.";
+  const s = statusOf(w), m = windowMarkers(w), c = m ? peakCore(m) : null;
+  if(s==="now") return c ? ("At its peak now (" + Math.round(c.cs) + "–" + Math.round(c.ce) + ") — the ideal time to open.") : "At its peak now — the ideal time to open.";
+  if(s==="early") return c ? ("Drinkable, but still improving — it should reach its best around " + c.mid + ", so there's no rush.") : "Drinkable, but still improving.";
+  if(s==="soon") return "Past its best but still drinking well — drink up over the next year or two.";
   if(s==="past") return "Likely past its drinking window — open soon if at all.";
   return m ? ("Too young — best left to age until around " + m.df + ".") : "Best left to age a while longer.";
 }
@@ -269,15 +271,18 @@ function windowText(w){
   if(!w.drinkFrom) return "—";
   return `${w.drinkFrom}–${w.drinkTo}` + (w.peakFrom?`  ·  peak ${w.peakFrom}–${w.peakTo}`:"");
 }
-// position 0..1 of "now" across the drink window, + peak band
+// position 0..1 of "now" across the drink window; gold band = the optimal core
 function meterGeom(w){
   const m = windowMarkers(w); if(!m) return null;
   const a=m.df, b=m.dt; if(b<=a) return null;
+  const c=peakCore(m);
   const clamp=v=>Math.max(0,Math.min(1,v));
   return {
     now: clamp((THIS_YEAR-a)/(b-a)),
-    peakL: clamp((m.pf-a)/(b-a)),
-    peakR: clamp((m.pt-a)/(b-a)),
+    peakL: clamp((c.cs-a)/(b-a)),
+    peakR: clamp((c.ce-a)/(b-a)),
+    coreStart: Math.round(c.cs),
+    coreEnd: Math.round(c.ce),
   };
 }
 const fmt$ = n => n==null ? "\u2014" : CURRENCY.symbol + Math.round(n).toLocaleString();
@@ -425,4 +430,4 @@ All four are 4-digit years and MUST satisfy drinkFrom <= peakFrom <= peakTo <= d
   return patch;
 }
 
-Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });
+Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, peakCore, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });

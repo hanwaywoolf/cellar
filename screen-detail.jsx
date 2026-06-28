@@ -27,7 +27,7 @@ function DetailScreen({ id, onClose }){
 
       <div className="screen-wrap" style={{paddingTop:0}}>
         {/* hero band */}
-        <div style={{background:"linear-gradient(160deg, var(--wine), var(--wine2))",color:"#f5ece1",padding:"calc(env(safe-area-inset-top,0) + 70px) 22px 26px",display:"flex",gap:18,alignItems:"flex-end"}}>
+        <div style={{background:"linear-gradient(160deg, var(--wine), var(--wine2))",color:"#f5ece1",padding:"calc(var(--safe-top) + 70px) 22px 26px",display:"flex",gap:18,alignItems:"flex-end"}}>
           <div style={{flex:"0 0 auto",borderRadius:14,overflow:"hidden",boxShadow:"0 12px 30px rgba(0,0,0,.35)"}}>
             <Bottle w={w} size={92}/>
           </div>
@@ -160,7 +160,7 @@ function DetailScreen({ id, onClose }){
       </div>
 
       {/* action bar */}
-      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 32%)",padding:"20px 18px calc(env(safe-area-inset-bottom,0) + 16px)",display:"flex",gap:12,alignItems:"flex-end"}}>
+      <div style={{position:"absolute",bottom:0,left:0,right:0,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 32%)",padding:"20px 18px calc(var(--safe-bottom) + 16px)",display:"flex",gap:12,alignItems:"flex-end"}}>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
           <span className="section-label">Bottles</span>
           <QtyStepper value={w.qty} onChange={v=>Cellar.setQty(w.id, v)} min={0}/>

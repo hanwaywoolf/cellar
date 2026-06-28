@@ -15,7 +15,7 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
 
   return (
     <>
-      <div className="topbar" style={{paddingTop:"calc(env(safe-area-inset-top,0) + 12px)"}}>
+      <div className="topbar" style={{paddingTop:"calc(var(--safe-top) + 12px)"}}>
         <button className="icon-btn" onClick={onCancel}><Ico n="x" s={20}/></button>
         <div style={{textAlign:"center"}}>
           <div style={{fontWeight:700,fontSize:15}}>Confirm wine</div>
@@ -144,7 +144,7 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
       </div>
 
       {/* add bar */}
-      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,zIndex:50,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 30%)",padding:"18px 18px calc(env(safe-area-inset-bottom,0) + 16px)",display:"flex",gap:12,alignItems:"center"}}>
+      <div style={{position:"fixed",bottom:0,left:"50%",transform:"translateX(-50%)",width:"100%",maxWidth:440,zIndex:50,background:"linear-gradient(rgba(243,236,224,0),var(--bg) 30%)",padding:"18px 18px calc(var(--safe-bottom) + 16px)",display:"flex",gap:12,alignItems:"center"}}>
         <div style={{display:"flex",flexDirection:"column",gap:4}}>
           <span className="section-label" style={{fontSize:9.5}}>Bottles</span>
           <QtyStepper value={qty} onChange={v=>setQty(Math.max(1,v))} min={1}/>
