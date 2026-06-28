@@ -25,7 +25,19 @@
   --serif:var(--sans);
   --mono:ui-monospace,'SF Mono',monospace;
   --safe-b:env(safe-area-inset-bottom,0px);
+  /* Safe-area insets. In a browser tab these are the raw env() values (0 when
+     there's no notch). When the app is installed (standalone) we guarantee a
+     minimum so the content always clears the iPad/iPhone status bar + home
+     indicator — iPadOS often reports 0 for the top inset even in standalone. */
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bottom:env(safe-area-inset-bottom,0px);
   --tabh:56px;
+}
+@media (display-mode:standalone){
+  :root{
+    --safe-top:max(env(safe-area-inset-top,0px), 24px);
+    --safe-bottom:max(env(safe-area-inset-bottom,0px), 16px);
+  }
 }
 
 *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }

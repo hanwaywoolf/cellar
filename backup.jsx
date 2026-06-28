@@ -225,6 +225,6 @@ function useBackup(){
   return BackupManager;
 }
 
-const APP_VERSION = "v11";
+const APP_VERSION = "v12";
 
 Object.assign(window, { BackupManager, useBackup, APP_VERSION });
