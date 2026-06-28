@@ -84,9 +84,9 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
           {/* value */}
           <div className="section-label" style={{margin:"6px 0 8px"}}>Value</div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
-            <F label="Est. value $" k="valueEst" type="number" w="1 1 30%"/>
-            <F label="Low $" k="valueLow" type="number" w="1 1 30%"/>
-            <F label="High $" k="valueHigh" type="number" w="1 1 30%"/>
+            <F label="Est. value £" k="valueEst" type="number" w="1 1 30%"/>
+            <F label="Low £" k="valueLow" type="number" w="1 1 30%"/>
+            <F label="High £" k="valueHigh" type="number" w="1 1 30%"/>
           </div>
 
           {/* storage location */}

@@ -2,7 +2,13 @@
 
 const THIS_YEAR = 2026;
 const LS_KEY = "cellar_wines_v2";
-const SCHEMA_VERSION = 2; // bump this when the wine object shape changes
+const SCHEMA_VERSION = 3; // bump this when the wine object shape changes
+const DATA_VER_LS = "cellar_schema_version";
+
+// Display currency. The AI now estimates values directly in GBP; legacy
+// USD-valued bottles are converted once via the v2->v3 migration below.
+const CURRENCY = { code:"GBP", symbol:"\u00A3" };
+const USD_TO_GBP = 0.79; // fixed conversion for one-time migration of pre-GBP data
 
 // ---------- migration ----------
 // Each step takes the wines array and returns an upgraded copy.
@@ -22,16 +28,20 @@ function migrateWines(wines, fromVersion){
     v = 2;
   }
 
-  // v2 -> v3 example (uncomment + bump SCHEMA_VERSION when needed):
-  // if(v < 3){
-  //   ws = ws.map(function(w){
-  //     // e.g. rename w.rack -> w.location.slot
-  //     if(w.rack != null && !w.location) w.location = { slot: w.rack };
-  //     delete w.rack;
-  //     return w;
-  //   });
-  //   v = 3;
-  // }
+  // v2 -> v3: app switched from USD to GBP. Convert money fields once and tag
+  // the wine with its currency so we never double-convert.
+  if(v < 3){
+    ws = ws.map(function(w){
+      if(w.currency !== "GBP"){
+        ["valueEst","valueLow","valueHigh","paid"].forEach(function(k){
+          if(typeof w[k] === "number" && isFinite(w[k])) w[k] = Math.round(w[k] * USD_TO_GBP);
+        });
+        w.currency = "GBP";
+      }
+      return w;
+    });
+    v = 3;
+  }
 
   return ws;
 }
@@ -56,6 +66,16 @@ function load(){
   if(!_wines){
     _wines = [];
     persist();
+    try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){}
+  } else {
+    // upgrade any data saved by an older app version (e.g. USD -> GBP)
+    let stored = 1;
+    try{ stored = parseInt(localStorage.getItem(DATA_VER_LS)||"2",10) || 2; }catch(e){ stored = 2; }
+    if(stored < SCHEMA_VERSION){
+      _wines = migrateWines(_wines, stored);
+      persist();
+      try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){}
+    }
   }
   return _wines;
 }
@@ -64,7 +84,7 @@ function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(_wines)); }
 const Cellar = {
   all(){ return load(); },
   get(id){ return load().find(w=>w.id===id); },
-  add(w){ const item = { id:uid(), addedAt:Date.now(), qty:1, photo:null, ...w }; _wines=[item, ...load()]; persist(); Cellar.scheduleAutoBackup(); return item; },
+  add(w){ const item = { id:uid(), addedAt:Date.now(), qty:1, photo:null, currency:"GBP", ...w }; _wines=[item, ...load()]; persist(); Cellar.scheduleAutoBackup(); return item; },
   // Find an existing wine that matches producer+cuvée+vintage+color (case-insensitive)
   findDuplicate(w){
     const norm = s => (s||"").trim().toLowerCase();
@@ -87,7 +107,7 @@ const Cellar = {
   update(id, patch){ _wines = load().map(w=> w.id===id ? {...w, ...patch} : w); persist(); },
   setQty(id, qty){ qty=Math.max(0,qty); if(qty===0){ Cellar.remove(id); return; } Cellar.update(id,{qty}); },
   remove(id){ _wines = load().filter(w=>w.id!==id); persist(); },
-  _restore(wines){ _wines = wines; persist(); },
+  _restore(wines){ _wines = wines; persist(); try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){} },
   openCoravin(id){ Cellar.update(id, { coravin:{ openedAt: Date.now() } }); },
   reseal(id){ Cellar.update(id, { coravin:null }); },
   finishBottle(id){ const w=Cellar.get(id); if(!w) return; const qty=(w.qty||1)-1; if(qty<=0){ Cellar.remove(id); } else { Cellar.update(id, { qty, coravin:null }); } },
@@ -160,7 +180,7 @@ function meterGeom(w){
     peakR: clamp((w.peakTo-a)/(b-a)),
   };
 }
-const fmt$ = n => n==null ? "—" : "$" + Math.round(n).toLocaleString();
+const fmt$ = n => n==null ? "\u2014" : CURRENCY.symbol + Math.round(n).toLocaleString();
 const COLOR_HEX = { Red:"#7a2233", White:"#c8a93f", "Rosé":"#d98a8f", Rose:"#d98a8f", Sparkling:"#b88a2a" };
 
 // ---------- professional critic ratings ----------
@@ -192,7 +212,7 @@ function coravinText(w){
 async function identifyFromText(ocrText){
   const prompt = `You are a master sommelier and wine database. Text was OCR-scanned from a wine bottle label (it may be messy, partial, or contain noise). Identify the wine and return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
 {"producer":string,"cuvee":string,"vintage":number,"color":"Red"|"White"|"Rosé"|"Sparkling","country":string,"region":string,"subregion":string,"appellation":string,"classification":string,"varietal":string,"abv":number,"critScore":number,"drinkFrom":number,"drinkTo":number,"peakFrom":number,"peakTo":number,"valueLow":number,"valueHigh":number,"valueEst":number,"pairings":string[],"tasting":string,"body":number,"tannin":number,"acidity":number,"sweetness":number,"ratings":{"RP":number|null,"JS":number|null,"WS":number|null,"AG":number|null,"JR":number|null,"D":number|null,"WE":number|null},"confidence":number}
-Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for unknown. critScore = the single highest score. confidence 0-100 = how sure you are of the identification. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.
+Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in GBP (British pounds sterling) — valueLow, valueHigh and valueEst must all be GBP amounts, not USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker, JS=James Suckling, WS=Wine Spectator, AG=Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for unknown. critScore = the single highest score. confidence 0-100 = how sure you are of the identification. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.
 
 OCR TEXT:
 """${ocrText.slice(0,1200)}"""`;
@@ -246,7 +266,7 @@ async function identifyFromImage(imageDataUrl){
   const data = m[2] || (imageDataUrl.split(",")[1] || imageDataUrl);
   const instruction = `You are a master sommelier with an encyclopedic wine database. Study this photo of a wine bottle label and identify the wine. Read every legible word — including small print, foil/gold lettering, and embossed or low-contrast text. Use producer logos and visual cues. Then return ONLY a JSON object (no markdown, no prose) with EXACTLY these keys:
 ${WINE_SCHEMA}
-Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. labelText = the exact words you can read on the label, comma-separated. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker/Wine Advocate, JS=James Suckling, WS=Wine Spectator, AG=Antonio Galloni/Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for any you don't know — only include scores you're confident about. critScore = the single highest/most authoritative score. confidence 0-100 = how sure you are of the identification. If the producer or wine is unclear, still give your best expert guess and lower the confidence. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.`;
+Rules: classification = the meaningful tier for that region (e.g. Rioja: Crianza/Reserva/Gran Reserva; Bordeaux: Cru Bourgeois/Grand Cru; else "Estate" or appellation tier). body/tannin/acidity/sweetness are 0-100. Estimate realistic current market value in GBP (British pounds sterling) — valueLow, valueHigh and valueEst must all be GBP amounts, not USD. drink window and peak are 4-digit years. pairings = 3-5 specific foods. tasting = one vivid sentence. labelText = the exact words you can read on the label, comma-separated. ratings = known professional critic scores for this specific wine+vintage (RP=Robert Parker/Wine Advocate, JS=James Suckling, WS=Wine Spectator, AG=Antonio Galloni/Vinous, JR=Jancis Robinson converted to 100-pt, D=Decanter, WE=Wine Enthusiast); use null for any you don't know — only include scores you're confident about. critScore = the single highest/most authoritative score. confidence 0-100 = how sure you are of the identification. If the producer or wine is unclear, still give your best expert guess and lower the confidence. If a field is unknown, make your best expert estimate. Today is ${THIS_YEAR}.`;
   const raw = await window.claude.complete({ messages:[{ role:"user", content:[
     { type:"image", source:{ type:"base64", media_type, data } },
     { type:"text", text:instruction }
