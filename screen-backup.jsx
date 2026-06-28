@@ -18,6 +18,9 @@ function BackupScreen({ onClose }){
     if(bk.driveConnected && driveList===null) fetchDriveList();
   }, [bk.driveConnected]);
 
+  // warm up Google's sign-in library on open so Connect Drive opens its popup instantly
+  React.useEffect(()=>{ bk.preloadGoogle && bk.preloadGoogle(); }, []);
+
   function flash(msg){ setStatus(msg); setTimeout(()=>setStatus(""), 3500); }
 
   async function fetchDriveList(){
@@ -199,6 +202,9 @@ function BackupScreen({ onClose }){
           </div>
         </div>
 
+      </div>
+      <div className="muted" style={{textAlign:"center",fontSize:11,marginTop:18,opacity:.6}}>
+        Storavin {typeof APP_VERSION!=="undefined"?window.APP_VERSION:""}
       </div>
     </div>
   );

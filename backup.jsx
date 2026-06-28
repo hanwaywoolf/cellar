@@ -52,6 +52,12 @@ async function _gSignIn(clientId){
         _gToken  = resp.access_token;
         _gExpiry = Date.now() + ((resp.expires_in || 3600) * 1000);
         resolve();
+      },
+      error_callback: function(err){
+        var t = (err && err.type) || "";
+        if(t === "popup_closed")      return reject(new Error("Sign-in window was closed before finishing. Tap Connect Drive and complete the Google sign-in."));
+        if(t === "popup_failed_to_open") return reject(new Error("Your browser blocked the Google sign-in popup. Allow popups for this site, then tap Connect Drive again."));
+        return reject(new Error((err && err.message) || "Google sign-in didn't complete. Please try again."));
       }
     });
     client.requestAccessToken({ prompt:"select_account" });
@@ -207,7 +213,10 @@ const BackupManager = {
   },
 
   /* subscriptions */
-  subscribe: function(fn){ _bkSubs.add(fn); return function(){ _bkSubs.delete(fn); }; }
+  subscribe: function(fn){ _bkSubs.add(fn); return function(){ _bkSubs.delete(fn); }; },
+
+  /* warm up Google's sign-in library ahead of the tap so the popup opens within the gesture */
+  preloadGoogle: function(){ try{ _loadGIS().catch(function(){}); }catch(e){} }
 };
 
 function useBackup(){
@@ -216,4 +225,6 @@ function useBackup(){
   return BackupManager;
 }
 
-Object.assign(window, { BackupManager, useBackup });
+const APP_VERSION = "v9";
+
+Object.assign(window, { BackupManager, useBackup, APP_VERSION });
