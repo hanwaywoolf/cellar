@@ -12,7 +12,35 @@ let _gExpiry = 0;
 function _tokenValid(){ return !!_gToken && Date.now() < _gExpiry - 30000; }
 function _gHeader(){ return { "Authorization": "Bearer " + _gToken }; }
 
+/* Lazily inject Google Identity Services and resolve when it's ready. */
+let _gisPromise = null;
+function _loadGIS(){
+  if(window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+  if(_gisPromise) return _gisPromise;
+  _gisPromise = new Promise(function(resolve, reject){
+    var existing = document.querySelector('script[data-gis]');
+    function ready(){
+      // GIS sets window.google.accounts shortly after the script loads
+      var tries = 0;
+      (function check(){
+        if(window.google && window.google.accounts && window.google.accounts.oauth2) return resolve();
+        if(tries++ > 60) return reject(new Error("Google sign-in library failed to initialise. Check your connection and try again."));
+        setTimeout(check, 50);
+      })();
+    }
+    if(existing){ existing.addEventListener("load", ready); ready(); return; }
+    var s = document.createElement("script");
+    s.src = "https://accounts.google.com/gsi/client";
+    s.async = true; s.defer = true; s.setAttribute("data-gis","1");
+    s.onload = ready;
+    s.onerror = function(){ _gisPromise = null; reject(new Error("Couldn't reach Google. Check your internet connection and try again.")); };
+    document.head.appendChild(s);
+  });
+  return _gisPromise;
+}
+
 async function _gSignIn(clientId){
+  await _loadGIS();
   return new Promise(function(resolve, reject){
     if(!window.google || !window.google.accounts || !window.google.accounts.oauth2)
       return reject(new Error("Google Identity Services not loaded. Check your connection."));
