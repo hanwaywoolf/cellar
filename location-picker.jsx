@@ -2,22 +2,22 @@
 
 const STORAGE_AREAS = [
   { id:"fridge", label:"Wine Fridge", sub:"Polar · 180 bottles", color:"#2a6fdb" },
-  { id:"rack",   label:"Wine Rack",   sub:"Wooden · 77 bottles", color:"#8b5e34" },
+  { id:"rack",   label:"Wine Rack",   sub:"Wooden · 120 bottles", color:"#8b5e34" },
   { id:"bar",    label:"Bar Cooler",   sub:"Built into bar",      color:"#a8782f" },
   { id:"drinks", label:"Drinks Fridge",sub:"Quick-serve",         color:"#3d8b5e" },
 ];
 const AREA_ICON = { fridge:"bottle", rack:"cellar", bar:"glass", drinks:"spark" };
 
 const FRIDGE_RACKS = 15;
-const RACK_ROWS = 7;   // A–G
-const RACK_COLS = 11;   // 1–11
+const RACK_ROWS = 12;   // A–L  (12 deep)
+const RACK_COLS = 10;   // 1–10 (10 wide)  → 120-bottle capacity, plus a "Top" shelf
 
 /* ---------- helpers ---------- */
 function locationLabel(loc){
   if(!loc||!loc.area) return null;
   switch(loc.area){
     case "fridge":{ let s="Wine Fridge · Rack "+(loc.rack||"?"); if(loc.depth) s+=" · "+(loc.depth==="front"?"Front":"Back"); return s; }
-    case "rack":{ return "Wine Rack · "+String.fromCharCode(64+(loc.row||1))+(loc.col||"?"); }
+    case "rack":{ if(loc.section==="top") return "Wine Rack · Top"; return "Wine Rack · "+String.fromCharCode(64+(loc.row||1))+(loc.col||"?"); }
     case "bar": return "Bar Cooler";
     case "drinks": return "Drinks Fridge";
     default: return null;
@@ -27,7 +27,7 @@ function locationShort(loc){
   if(!loc||!loc.area) return null;
   switch(loc.area){
     case "fridge": return "Fridge R"+(loc.rack||"?")+(loc.depth?(loc.depth==="front"?"F":"B"):"");
-    case "rack": return "Rack "+String.fromCharCode(64+(loc.row||1))+(loc.col||"?");
+    case "rack": return loc.section==="top" ? "Rack Top" : "Rack "+String.fromCharCode(64+(loc.row||1))+(loc.col||"?");
     case "bar": return "Bar";
     case "drinks": return "Drinks";
     default: return "?";
@@ -63,6 +63,7 @@ function LocationPicker({ value, onChange, wines }){
   function setRack(n){ onChange({...value, area:"fridge", rack:n}); }
   function setDepth(d){ onChange({...value, area:"fridge", depth:value?.depth===d?null:d}); }
   function setSlot(r,c){ onChange({area:"rack", row:r, col:c}); }
+  function setTop(){ onChange(value?.section==="top" ? null : {area:"rack", section:"top"}); }
 
   /* occupied-position counts for visual hints */
   const occ = React.useMemo(()=>{
@@ -148,7 +149,17 @@ function LocationPicker({ value, onChange, wines }){
       {/* wine rack grid */}
       {area==="rack"&&(
         <div className="fade-in">
-          <div className="section-label" style={{marginBottom:8}}>Tap a slot  ·  row A–G, column 1–11</div>
+          <button onClick={setTop}
+            style={{width:"100%",marginBottom:10,padding:"11px 14px",borderRadius:10,
+              border:"1.5px solid "+(value?.section==="top"?"#8b5e34":"var(--line2)"),
+              background:value?.section==="top"?"#8b5e34":"var(--card)",
+              color:value?.section==="top"?"#fff":"var(--ink)",
+              display:"flex",alignItems:"center",justifyContent:"space-between",
+              fontSize:13.5,fontWeight:value?.section==="top"?700:600}}>
+            <span style={{display:"flex",alignItems:"center",gap:8}}><Ico n="cellar" s={15}/>Top of rack</span>
+            <span style={{fontSize:11,fontWeight:600,opacity:.85}}>{value?.section==="top"?"✓ Selected":"upper storage shelf"}</span>
+          </button>
+          <div className="section-label" style={{marginBottom:8}}>Tap a slot  ·  row A–L, column 1–10</div>
           <div style={{overflowX:"auto",paddingBottom:4,WebkitOverflowScrolling:"touch"}}>
             <table style={{borderCollapse:"collapse"}}>
               <thead>
@@ -190,6 +201,11 @@ function LocationPicker({ value, onChange, wines }){
           {value?.row&&value?.col&&(
             <div style={{marginTop:8,fontSize:13,fontWeight:600,color:"#8b5e34"}}>
               Selected: {String.fromCharCode(64+value.row)}{value.col}
+            </div>
+          )}
+          {value?.section==="top"&&(
+            <div style={{marginTop:8,fontSize:13,fontWeight:600,color:"#8b5e34"}}>
+              Selected: Top of rack
             </div>
           )}
         </div>

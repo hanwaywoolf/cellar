@@ -1,9 +1,12 @@
 /* screen-confirm.jsx — editable AI-identified wine before adding */
 
-function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, onSave, onRetake }){
-  const [showRaw, setShowRaw] = React.useState(false);
-  const [advanced, setAdvanced] = React.useState(false);
-  const F = ({label, k, type="text", w, ph}) => (
+/* Stable, top-level field component. Defining the field component INSIDE
+   ConfirmForm meant React saw a brand-new component type on every keystroke,
+   which unmounted and remounted the <input> and stole focus after a single
+   character. Hoisting it out (and passing draft/field as props) keeps the input
+   mounted so typing flows continuously. */
+function CField({ label, k, type="text", w, ph, draft, field }){
+  return (
     <label style={{display:"flex",flexDirection:"column",gap:5,flex:w||"1 1 100%",minWidth:0}}>
       <span className="section-label" style={{fontSize:10}}>{label}</span>
       <input className="field" style={{padding:"10px 12px",fontSize:14}} type={type} value={draft[k]??""} placeholder={ph||""}
@@ -11,6 +14,14 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
         onChange={e=>field(k, type==="number"? (e.target.value===""?"":e.target.value) : e.target.value)} />
     </label>
   );
+}
+
+function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, onSave, onRetake }){
+  const [showRaw, setShowRaw] = React.useState(false);
+  const [advanced, setAdvanced] = React.useState(false);
+  // Helper invoked as a plain function call ({F({...})}) — NOT as <F/> — so the
+  // returned <CField> reuses the stable top-level type and the input keeps focus.
+  const F = (props) => <CField {...props} draft={draft} field={field}/>;
   const named = (draft.producer||draft.cuvee);
 
   return (
@@ -48,9 +59,9 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
 
           {/* identity */}
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
-            <F label="Producer" k="producer" w="1 1 100%"/>
-            <F label="Cuvée / name" k="cuvee" w="1 1 60%"/>
-            <F label="Vintage" k="vintage" type="number" w="1 1 30%"/>
+            {F({label:"Producer", k:"producer", w:"1 1 100%"})}
+            {F({label:"Cuvée / name", k:"cuvee", w:"1 1 60%"})}
+            {F({label:"Vintage", k:"vintage", type:"number", w:"1 1 30%"})}
           </div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
             <label style={{display:"flex",flexDirection:"column",gap:5,flex:"1 1 40%"}}>
@@ -59,34 +70,34 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
                 {COLORS.map(c=><option key={c}>{c}</option>)}
               </select>
             </label>
-            <F label="Varietal" k="varietal" w="1 1 50%"/>
+            {F({label:"Varietal", k:"varietal", w:"1 1 50%"})}
           </div>
 
           {/* origin — feeds the cellar drill-down */}
           <div className="section-label" style={{margin:"6px 0 8px"}}>Origin</div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:10}}>
-            <F label="Country" k="country" w="1 1 45%"/>
-            <F label="Region" k="region" w="1 1 45%"/>
-            <F label="Sub-region" k="subregion" w="1 1 45%"/>
-            <F label="Classification" k="classification" w="1 1 45%" ph="e.g. Reserva"/>
+            {F({label:"Country", k:"country", w:"1 1 45%"})}
+            {F({label:"Region", k:"region", w:"1 1 45%"})}
+            {F({label:"Sub-region", k:"subregion", w:"1 1 45%"})}
+            {F({label:"Classification", k:"classification", w:"1 1 45%", ph:"e.g. Reserva"})}
           </div>
 
           {/* drink window */}
           <div className="section-label" style={{margin:"6px 0 8px"}}>Drink window</div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:6}}>
-            <F label="Drink from" k="drinkFrom" type="number" w="1 1 21%"/>
-            <F label="Peak from" k="peakFrom" type="number" w="1 1 21%"/>
-            <F label="Peak to" k="peakTo" type="number" w="1 1 21%"/>
-            <F label="Drink by" k="drinkTo" type="number" w="1 1 21%"/>
+            {F({label:"Drink from", k:"drinkFrom", type:"number", w:"1 1 21%"})}
+            {F({label:"Peak from", k:"peakFrom", type:"number", w:"1 1 21%"})}
+            {F({label:"Peak to", k:"peakTo", type:"number", w:"1 1 21%"})}
+            {F({label:"Drink by", k:"drinkTo", type:"number", w:"1 1 21%"})}
           </div>
           {meterGeom(draft) && <div style={{margin:"4px 2px 14px"}}><DrinkMeter w={draft}/></div>}
 
           {/* value */}
           <div className="section-label" style={{margin:"6px 0 8px"}}>Value</div>
           <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
-            <F label="Est. value £" k="valueEst" type="number" w="1 1 30%"/>
-            <F label="Low £" k="valueLow" type="number" w="1 1 30%"/>
-            <F label="High £" k="valueHigh" type="number" w="1 1 30%"/>
+            {F({label:"Est. value £", k:"valueEst", type:"number", w:"1 1 30%"})}
+            {F({label:"Low £", k:"valueLow", type:"number", w:"1 1 30%"})}
+            {F({label:"High £", k:"valueHigh", type:"number", w:"1 1 30%"})}
           </div>
 
           {/* storage location */}

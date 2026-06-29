@@ -301,13 +301,20 @@ const SyncManager = {
   },
 
   // Pull the shared file, merge it into local state, push the merged result back.
-  syncNow: async function(){
+  // `interactive` MUST only be true when called directly from a user tap. A
+  // background/auto sync (page load, visibility, online, debounced push) must
+  // never trigger Google's sign-in UI — doing so was what threw up a Google
+  // login screen on every refresh. Without a valid in-memory token we simply
+  // mark needs_auth and bail; the user re-establishes a token from the Backup
+  // screen's "Connect Drive" button, after which sync resumes for the session.
+  syncNow: async function(interactive){
     if(_syncing) return;
     var id = _ls.getClientId();
     if(!id) throw new Error("Connect Google Drive first.");
     _syncing = true; _syncErr = ""; _notify();
     try{
       if(!_tokenValid()){
+        if(!interactive){ _syncErr = "needs_auth"; _syncing = false; _notify(); return; }
         try { await _gSilentToken(id); }
         catch(e){ _syncErr = "needs_auth"; throw new Error("needs_auth"); }
       }
