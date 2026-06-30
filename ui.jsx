@@ -37,6 +37,7 @@ const Ico = ({ n, s=24, sw=1.8, fill=false }) => {
     info: <>{C(12,12,8.5)}{P("M12 11v5M12 8.2v.2")}</>,
     download: <>{P("M12 4v11M8 11l4 4 4-4")}{P("M4 19h16")}</>,
     grid: <>{P("M4 4h7v7H4z")}{P("M13 4h7v7h-7z")}{P("M4 13h7v7H4z")}{P("M13 13h7v7h-7z")}</>,
+    flash: P("M13 2 4 14h6l-1 8 9-12h-6l1-8Z", {fill:fill?"currentColor":"none"}),
   };
   return <svg viewBox="0 0 24 24" width={s} height={s} style={{display:"block"}}>{paths[n]}</svg>;
 };

@@ -18,6 +18,7 @@ function downscale(src, max, q=0.82){
 }
 
 const COLORS = ["Red","White","Rosé","Sparkling"];
+const FLASH_LS = "cellar_scan_flash";
 
 function ScanScreen({ start="camera", onClose, onAdded }){
   const [phase, setPhase] = React.useState(start==="manual" ? "confirm" : "camera"); // camera | processing | confirm | error
@@ -33,7 +34,10 @@ function ScanScreen({ start="camera", onClose, onAdded }){
   const [camReady, setCamReady] = React.useState(false);
   const videoRef = React.useRef(null);
   const streamRef = React.useRef(null);
+  const trackRef = React.useRef(null);
   const fileRef = React.useRef(null);
+  const [flashOn, setFlashOn] = React.useState(()=>{ try{ return localStorage.getItem(FLASH_LS)==="true"; }catch(e){ return false; } });
+  const [torchSupported, setTorchSupported] = React.useState(false);
 
   // start camera
   React.useEffect(()=>{
@@ -44,18 +48,35 @@ function ScanScreen({ start="camera", onClose, onAdded }){
         const s = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:{ideal:"environment"} }, audio:false });
         if(cancelled){ s.getTracks().forEach(t=>t.stop()); return; }
         streamRef.current=s;
+        const track = s.getVideoTracks()[0];
+        trackRef.current = track;
+        let canTorch = false;
+        try{ const caps = track.getCapabilities ? track.getCapabilities() : {}; canTorch = !!caps.torch; }catch(e){}
+        setTorchSupported(canTorch);
+        if(canTorch && flashOn){ try{ await track.applyConstraints({ advanced:[{ torch:true }] }); }catch(e){} }
         if(videoRef.current){ videoRef.current.srcObject=s; await videoRef.current.play().catch(()=>{}); setCamReady(true); }
       }catch(e){ setCamReady(false); }
     })();
     return ()=>{ cancelled=true; stopCam(); };
   },[phase]);
 
-  function stopCam(){ if(streamRef.current){ streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; } }
+  function stopCam(){ if(streamRef.current){ streamRef.current.getTracks().forEach(t=>t.stop()); streamRef.current=null; trackRef.current=null; } }
+
+  function toggleFlash(){
+    const next = !flashOn;
+    setFlashOn(next);
+    try{ localStorage.setItem(FLASH_LS, String(next)); }catch(e){}
+    if(torchSupported && trackRef.current){ trackRef.current.applyConstraints({ advanced:[{ torch:next }] }).catch(()=>{}); }
+  }
 
   function captureFromVideo(){
     const v=videoRef.current; if(!v||!v.videoWidth) return;
     const c=document.createElement("canvas"); c.width=v.videoWidth; c.height=v.videoHeight;
-    c.getContext("2d").drawImage(v,0,0);
+    const ctx=c.getContext("2d");
+    // when the hardware has no torch (most phones in a browser), boost exposure
+    // digitally so a dim cellar shot still reads cleanly
+    if(flashOn && !torchSupported) ctx.filter = "brightness(1.4) contrast(1.08) saturate(1.05)";
+    ctx.drawImage(v,0,0);
     stopCam();
     runPipeline(c.toDataURL("image/jpeg",0.9));
   }
@@ -136,7 +157,10 @@ function ScanScreen({ start="camera", onClose, onAdded }){
           <div style={{position:"absolute",top:0,left:0,right:0,display:"flex",justifyContent:"space-between",alignItems:"center",padding:"calc(var(--safe-top) + 14px) 16px"}}>
             <button className="icon-btn" onClick={()=>{stopCam();onClose();}}><Ico n="x" s={20}/></button>
             <span style={{color:"#f3ece0",fontSize:13,fontWeight:600,background:"rgba(0,0,0,.35)",padding:"6px 12px",borderRadius:20,whiteSpace:"nowrap"}}>Scan a label</span>
-            <div style={{width:42}}/>
+            <button className="icon-btn" onClick={toggleFlash} title={torchSupported?"Torch":"Low-light boost"}
+              style={{background:flashOn?"#e8b923":"rgba(255,253,249,.16)",border:"none",color:flashOn?"#1a1413":"#f3ece0"}}>
+              <Ico n="flash" s={18} fill={flashOn}/>
+            </button>
           </div>
           {/* controls */}
           <div style={{position:"absolute",bottom:0,left:0,right:0,display:"flex",alignItems:"flex-end",justifyContent:"space-around",padding:"20px 24px calc(var(--safe-bottom) + 22px)"}}>
