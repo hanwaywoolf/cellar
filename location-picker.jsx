@@ -13,21 +13,30 @@ const RACK_ROWS = 12;   // A–L  (12 deep)
 const RACK_COLS = 10;   // 1–10 (10 wide)  → 120-bottle capacity, plus a "Top" shelf
 
 /* ---------- helpers ---------- */
-function locationLabel(loc){
+// A rack-stored wine occupies `qty` consecutive columns from its starting column,
+// e.g. 4 bottles placed at row A col 1 fill A1–A4. Clamp the end to the rack width.
+function rackRange(loc, qty){
+  const letter = String.fromCharCode(64+(loc.row||1));
+  const start = loc.col||1;
+  const n = Math.max(1, qty||1);
+  const end = Math.min(start + n - 1, RACK_COLS);
+  return end>start ? (letter+start+"–"+letter+end) : (letter+start);
+}
+function locationLabel(loc, qty){
   if(!loc||!loc.area) return null;
   switch(loc.area){
     case "fridge":{ let s="Wine Fridge · Rack "+(loc.rack||"?"); if(loc.depth) s+=" · "+(loc.depth==="front"?"Front":"Back"); return s; }
-    case "rack":{ if(loc.section==="top") return "Wine Rack · Top"; return "Wine Rack · "+String.fromCharCode(64+(loc.row||1))+(loc.col||"?"); }
+    case "rack":{ if(loc.section==="top") return "Wine Rack · Top"; return "Wine Rack · "+rackRange(loc, qty); }
     case "bar": return "Bar Cooler";
     case "drinks": return "Drinks Fridge";
     default: return null;
   }
 }
-function locationShort(loc){
+function locationShort(loc, qty){
   if(!loc||!loc.area) return null;
   switch(loc.area){
     case "fridge": return "Fridge R"+(loc.rack||"?")+(loc.depth?(loc.depth==="front"?"F":"B"):"");
-    case "rack": return loc.section==="top" ? "Rack Top" : "Rack "+String.fromCharCode(64+(loc.row||1))+(loc.col||"?");
+    case "rack": return loc.section==="top" ? "Rack Top" : "Rack "+rackRange(loc, qty);
     case "bar": return "Bar";
     case "drinks": return "Drinks";
     default: return "?";
@@ -40,13 +49,13 @@ function locationColor(loc){
 }
 
 /* ---------- display chip ---------- */
-function LocationChip({ loc, size }){
+function LocationChip({ loc, qty, size }){
   if(!loc||!loc.area) return null;
   const color = locationColor(loc);
   const fs = size==="md" ? 12.5 : 11;
   return (
     <span style={{display:"inline-flex",alignItems:"center",gap:4,background:color+"14",color:color,borderRadius:6,padding:"3px 8px",fontSize:fs,fontWeight:600,whiteSpace:"nowrap"}}>
-      <Ico n="pin" s={fs-1}/>{locationShort(loc)}
+      <Ico n="pin" s={fs-1}/>{locationShort(loc, qty)}
     </span>
   );
 }
@@ -75,7 +84,8 @@ function LocationPicker({ value, onChange, wines }){
         f[k]=(f[k]||0)+(w.qty||1);
       }
       if(w.location.area==="rack"&&w.location.row&&w.location.col){
-        r[w.location.row+"-"+w.location.col]=true;
+        const n=Math.max(1, w.qty||1);
+        for(let i=0;i<n;i++){ const c=w.location.col+i; if(c>=1&&c<=RACK_COLS) r[w.location.row+"-"+c]=true; }
       }
     });
     return {f,r};
@@ -234,7 +244,7 @@ function LocationCard({ wine, onEdit }){
     <button onClick={onEdit} className="card" style={{padding:"14px 15px",marginBottom:14,width:"100%",textAlign:"left",display:"flex",gap:12,alignItems:"center",borderColor:color+"30",background:color+"08"}}>
       <span style={{width:36,height:36,borderRadius:10,background:color+"18",display:"grid",placeItems:"center",color:color}}><Ico n="pin" s={18}/></span>
       <div style={{flex:1}}>
-        <div style={{fontSize:14,fontWeight:600}}>{locationLabel(loc)}</div>
+        <div style={{fontSize:14,fontWeight:600}}>{locationLabel(loc, wine.qty)}</div>
         <div style={{fontSize:12,color:"var(--muted)"}}>Tap to change</div>
       </div>
       <span className="muted"><Ico n="chevR" s={16}/></span>

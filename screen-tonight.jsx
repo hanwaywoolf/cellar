@@ -94,7 +94,7 @@ function TonightScreen({ onOpen }){
                   <div className="wine-meta">{top.w.cuvee?top.w.cuvee+" · ":""}{top.w.varietal} · {top.w.vintage}</div>
                   <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap",alignItems:"center"}}>
                     <StatusPill w={top.w}/>
-                    {top.w.location && <LocationChip loc={top.w.location}/>}
+                    {top.w.location && <LocationChip loc={top.w.location} qty={top.w.qty}/>}
                     {top.reasons[0] && <span className="chip gold" style={{fontSize:11.5,padding:"3px 9px"}}><Ico n="check" s={12}/>{top.reasons[0]}</span>}
                   </div>
                 </div>
@@ -112,7 +112,7 @@ function TonightScreen({ onOpen }){
                 <div style={{flex:1,minWidth:0}}>
                   <div className="wine-name" style={{fontSize:15,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{w.producer}{w.cuvee?<span className="cuvee"> · {w.cuvee}</span>:""}</div>
                   <div className="wine-meta">{reasons[0]||statusLabel(w)} · {w.region}</div>
-                  {w.location && <div style={{marginTop:4}}><LocationChip loc={w.location}/></div>}
+                  {w.location && <div style={{marginTop:4}}><LocationChip loc={w.location} qty={w.qty}/></div>}
                 </div>
                 <StatusPill w={w}/>
               </button>

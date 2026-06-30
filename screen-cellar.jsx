@@ -74,7 +74,7 @@ function renderSlot(slot, w){
     case "varietal": return w.varietal ? <span key={slot} className="chip" style={{padding:"3px 9px",fontSize:11.5}}><ColorDot color={w.color}/>{w.varietal}</span> : null;
     case "region": return w.region ? <span key={slot} className="chip" style={{padding:"3px 9px",fontSize:11.5}}><Ico n="pin" s={12}/>{w.region}</span> : null;
     case "vintage": return w.vintage ? <span key={slot} className="chip" style={{padding:"3px 9px",fontSize:11.5}}>{w.vintage}</span> : null;
-    case "location": return w.location ? <LocationChip key={slot} loc={w.location}/> : null;
+    case "location": return w.location ? <LocationChip key={slot} loc={w.location} qty={w.qty}/> : null;
     default: return null;
   }
 }

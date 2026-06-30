@@ -185,7 +185,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
                       <RatingPills w={w} max={2}/>
                     </td>
                     <td style={{textAlign:"right",fontWeight:600,fontSize:14,whiteSpace:"nowrap"}}>{fmt$(w.valueEst)}</td>
-                    <td>{w.location ? <LocationChip loc={w.location}/> : <span className="muted" style={{fontSize:11}}>—</span>}</td>
+                    <td>{w.location ? <LocationChip loc={w.location} qty={w.qty}/> : <span className="muted" style={{fontSize:11}}>—</span>}</td>
                     <td style={{textAlign:"right",color:"var(--muted)",fontSize:13}}>×{w.qty}</td>
                   </tr>
                 ))}
@@ -203,7 +203,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
                     <div style={{display:"flex",gap:7,marginTop:6,alignItems:"center",flexWrap:"wrap"}}>
                       <StatusPill w={w}/>
                       <RatingPills w={w} max={2}/>
-                      {w.location && <LocationChip loc={w.location}/>}
+                      {w.location && <LocationChip loc={w.location} qty={w.qty}/>}
                       {coravinInfo(w) && <span className="chip gold" style={{padding:"3px 9px",fontSize:11.5}}><Ico n="clock" s={12}/>{coravinText(w)}</span>}
                     </div>
                   </div>
