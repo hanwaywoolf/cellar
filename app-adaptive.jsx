@@ -55,6 +55,7 @@ function PhoneAppInner(){
   const [scanMode, setScanMode] = React.useState(null);
   const [detailId, setDetailId] = React.useState(null);
   const [filters, setFilters] = React.useState(EMPTY_FILTERS_A);
+  const [storageMapOpen, setStorageMapOpen] = React.useState(false);
 
   const open = (id)=> setDetailId(id);
   const drillTo = (patch)=>{ setFilters({ ...EMPTY_FILTERS_A, ...patch }); setTab("cellar"); };
@@ -70,7 +71,7 @@ function PhoneAppInner(){
   return (
     <div className="app app-phone">
       <div key={tab} className="fade-in" style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
-        {tab==="cellar" && <CellarScreen onOpen={open} openScan={(mode)=>setScanMode(mode||"camera")} filters={filters} setFilters={setFilters}/>}
+        {tab==="cellar" && <CellarScreen onOpen={open} openScan={(mode)=>setScanMode(mode||"camera")} openStorageMap={()=>setStorageMapOpen(true)} filters={filters} setFilters={setFilters}/>}
         {tab==="tonight" && <TonightScreen onOpen={open}/>}
         {tab==="pairing" && <PairingScreen onOpen={open}/>}
         {tab==="stats" && <StatsScreen onDrill={drillTo}/>}
@@ -90,6 +91,7 @@ function PhoneAppInner(){
 
       {detailId && <DetailScreen id={detailId} onClose={()=>setDetailId(null)}/>}
       {scanMode && <ScanScreen start={scanMode} onClose={()=>setScanMode(null)} onAdded={(id)=>{ setScanMode(null); setTab("cellar"); setDetailId(id); }}/>}
+      {storageMapOpen && <StorageMapScreen onClose={()=>setStorageMapOpen(false)} onOpenWine={(id)=>{ setStorageMapOpen(false); setDetailId(id); }}/>}
     </div>
   );
 }
@@ -105,6 +107,7 @@ function IPadAppInner(){
   const drillTo = (patch)=>{ setFilters({ ...EMPTY_FILTERS_A, ...patch }); setTab("cellar"); };
 
   const hasDetail = detailId && tab === "cellar";
+  const [storageMapOpen, setStorageMapOpen] = React.useState(false);
 
   return (
     <div className={"app app-ipad"+(hasDetail?" detail-open":"")}>
@@ -112,7 +115,7 @@ function IPadAppInner(){
 
       <main className="main-area">
         <div key={tab} className="fade-in" style={{display:"flex",flexDirection:"column",flex:1,minHeight:0}}>
-          {tab==="cellar" && <CellarScreenIPad onOpen={open} selectedId={detailId} openScan={(mode)=>setScanMode(mode||"camera")} filters={filters} setFilters={setFilters}/>}
+          {tab==="cellar" && <CellarScreenIPad onOpen={open} selectedId={detailId} openScan={(mode)=>setScanMode(mode||"camera")} openStorageMap={()=>setStorageMapOpen(true)} filters={filters} setFilters={setFilters}/>}
           {tab==="tonight" && <TonightScreen onOpen={(id)=>{setTab("cellar");setDetailId(id);}}/>}
           {tab==="pairing" && <PairingScreen onOpen={(id)=>{setTab("cellar");setDetailId(id);}}/>}
           {tab==="stats" && <StatsScreen onDrill={drillTo}/>}
@@ -123,6 +126,7 @@ function IPadAppInner(){
       {hasDetail && <DetailPanel id={detailId} onClose={()=>setDetailId(null)}/>}
 
       {scanMode && <ScanScreen start={scanMode} onClose={()=>setScanMode(null)} onAdded={(id)=>{ setScanMode(null); setTab("cellar"); setDetailId(id); }}/>}
+      {storageMapOpen && <StorageMapScreen onClose={()=>setStorageMapOpen(false)} onOpenWine={(id)=>{ setStorageMapOpen(false); setTab("cellar"); setDetailId(id); }}/>}
     </div>
   );
 }

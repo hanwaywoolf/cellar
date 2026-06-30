@@ -36,6 +36,7 @@ const Ico = ({ n, s=24, sw=1.8, fill=false }) => {
     sun: <>{C(12,12,4)}{P("M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M18.4 5.6 17 7M7 17l-1.4 1.4")}</>,
     info: <>{C(12,12,8.5)}{P("M12 11v5M12 8.2v.2")}</>,
     download: <>{P("M12 4v11M8 11l4 4 4-4")}{P("M4 19h16")}</>,
+    grid: <>{P("M4 4h7v7H4z")}{P("M13 4h7v7h-7z")}{P("M4 13h7v7H4z")}{P("M13 13h7v7h-7z")}</>,
   };
   return <svg viewBox="0 0 24 24" width={s} height={s} style={{display:"block"}}>{paths[n]}</svg>;
 };

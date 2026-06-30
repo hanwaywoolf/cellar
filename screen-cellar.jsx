@@ -169,7 +169,7 @@ function BackupSheet({ onClose }){
   );
 }
 
-function CellarScreen({ onOpen, openScan, filters, setFilters }){
+function CellarScreen({ onOpen, openScan, openStorageMap, filters, setFilters }){
   const wines = useCellar();
   const [q, setQ] = React.useState("");
   const [showSearch, setShowSearch] = React.useState(false);
@@ -241,6 +241,7 @@ function CellarScreen({ onOpen, openScan, filters, setFilters }){
         </div>
         <div style={{display:"flex",gap:6}}>
           <button className="icon-btn" onClick={()=>setShowBackup(true)}><Ico n="download" s={19}/></button>
+          <button className="icon-btn" onClick={openStorageMap}><Ico n="grid" s={19}/></button>
           <button className="icon-btn" onClick={()=>setPicker("slots")}><Ico n="sliders" s={19}/></button>
           <button className="icon-btn" onClick={()=>setShowSearch(s=>!s)}><Ico n="search" s={20}/></button>
         </div>

@@ -1,6 +1,6 @@
 /* screen-cellar-ipad.jsx — table view for iPad with sortable columns */
 
-function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters }){
+function CellarScreenIPad({ onOpen, selectedId, openScan, openStorageMap, filters, setFilters }){
   const wines = useCellar();
   const [q, setQ] = React.useState("");
   const [sort, setSort] = React.useState("smart");
@@ -102,6 +102,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
             </button>
           </div>
+          <button className="icon-btn" onClick={openStorageMap}><Ico n="grid" s={19}/></button>
           <button className="icon-btn" onClick={()=>setPicker("sort")}><Ico n="sliders" s={19}/></button>
         </div>
       </div>
