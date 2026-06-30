@@ -140,11 +140,19 @@ function LocationPicker({ value, onChange, wines, qty=1 }){
   /* ----- fridge ----- */
   function setRackSingle(n){ emit([{...cur, area:"fridge", rack:n}]); }
   function setDepth(d){ emit([{...cur, area:"fridge", depth:cur?.depth===d?undefined:d}]); }
-  function toggleRack(n){
-    const i = slots.findIndex(s=>s.area==="fridge"&&s.rack===n);
-    if(i>=0){ emit(slots.filter((_,k)=>k!==i)); return; }
-    if(slots.length>=qty) return;
-    emit([...slots, {area:"fridge", rack:n}]);
+  // Multi-bottle fridge: a rack holds many bottles, so tapping a rack assigns one
+  // more bottle to it (tap 3× to put all three on the same rack). Tapping once the
+  // count would overflow `qty` clears that rack so you can re-allocate.
+  function bumpRack(n){
+    const count = slots.filter(s=>s.area==="fridge"&&s.rack===n).length;
+    const others = slots.filter(s=>!(s.area==="fridge"&&s.rack===n));
+    const newCount = count + 1;
+    if(others.length + newCount <= qty){
+      const add = Array.from({length:newCount},()=>({area:"fridge", rack:n}));
+      emit([...others, ...add]);
+    } else {
+      emit(others); // would exceed → clear this rack's bottles
+    }
   }
 
   /* ----- rack grid ----- */
@@ -229,26 +237,31 @@ function LocationPicker({ value, onChange, wines, qty=1 }){
       {area==="fridge"&&(
         <div className="fade-in">
           <ProgressNote verb="Pick"/>
-          <div className="section-label" style={{marginBottom:8}}>{multi?"Tap racks (1–15)":"Select rack (1–15)"}</div>
+          <div className="section-label" style={{marginBottom:8}}>{multi?"Tap a rack once per bottle (1–15)":"Select rack (1–15)"}</div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,marginBottom:10}}>
             {Array.from({length:FRIDGE_RACKS},(_,i)=>i+1).map(n=>{
-              const on = multi ? slots.some(s=>s.area==="fridge"&&s.rack===n) : value?.rack===n;
-              const idx = multi ? slots.findIndex(s=>s.area==="fridge"&&s.rack===n) : -1;
+              const here = multi ? slots.filter(s=>s.area==="fridge"&&s.rack===n).length : (value?.rack===n?1:0);
+              const on = here>0;
               const cnt=occ.f["r"+n]||0;
               const full = multi && !on && slots.length>=qty;
               return (
-                <button key={n} onClick={()=>multi?toggleRack(n):setRackSingle(n)} disabled={full}
+                <button key={n} onClick={()=>multi?bumpRack(n):setRackSingle(n)} disabled={full}
                   style={{height:46,borderRadius:10,fontSize:16,fontWeight:700,position:"relative",
                     background:on?"#2a6fdb":"var(--card)",color:on?"#fff":full?"var(--faint)":"var(--ink)",
                     border:"1.5px solid "+(on?"#2a6fdb":"var(--line2)"),opacity:full?.5:1,
                     display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
                   {n}
                   {cnt>0&&!on&&<span style={{fontSize:8.5,color:"var(--muted)",marginTop:-2}}>{cnt}</span>}
-                  {multi&&on&&<span style={{position:"absolute",top:3,right:5,fontSize:9,fontWeight:800,opacity:.9}}>{idx+1}</span>}
+                  {multi&&here>0&&<span style={{position:"absolute",top:3,right:5,fontSize:9.5,fontWeight:800}}>×{here}</span>}
                 </button>
               );
             })}
           </div>
+          {multi && (
+            <div className="muted" style={{fontSize:11.5,marginTop:-2,marginBottom:8}}>
+              All on one rack? Tap it {qty} times. Over-tap a rack to clear it.
+            </div>
+          )}
           {!multi && value?.rack&&(
             <div className="fade-in">
               <div className="section-label" style={{marginBottom:7}}>Depth (optional)</div>
