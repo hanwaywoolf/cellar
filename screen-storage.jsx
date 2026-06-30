@@ -16,17 +16,30 @@ function fridgeRackCount(wines, rackNum){
   });
   return n;
 }
-function fridgeRackWines(wines, rackNum){
-  return wines.filter(w=>{
-    if(Array.isArray(w.slots) && w.slots.length) return w.slots.some(s=>s && s.area==="fridge" && s.rack===rackNum);
-    return w.location && w.location.area==="fridge" && w.location.rack===rackNum;
-  });
+// per-wine entries for a rack: { w, here } where `here` is how many of THIS
+// wine's bottles sit on this exact rack (vs its total qty across the cellar) —
+// lets the UI show "5/6 bottles" when the rest live elsewhere.
+function fridgeRackEntries(wines, rackNum){
+  return wines.map(w=>{
+    let here = 0;
+    if(Array.isArray(w.slots) && w.slots.length){
+      here = w.slots.filter(s=>s && s.area==="fridge" && s.rack===rackNum).length;
+    } else if(w.location && w.location.area==="fridge" && w.location.rack===rackNum){
+      here = w.qty||1;
+    }
+    return { w, here };
+  }).filter(e=>e.here>0);
 }
-function fridgeUnassignedWines(wines){
-  return wines.filter(w=>{
-    if(Array.isArray(w.slots) && w.slots.length) return w.slots.some(s=>s && s.area==="fridge" && !s.rack);
-    return w.location && w.location.area==="fridge" && !w.location.rack;
-  });
+function fridgeUnassignedEntries(wines){
+  return wines.map(w=>{
+    let here = 0;
+    if(Array.isArray(w.slots) && w.slots.length){
+      here = w.slots.filter(s=>s && s.area==="fridge" && !s.rack).length;
+    } else if(w.location && w.location.area==="fridge" && !w.location.rack){
+      here = w.qty||1;
+    }
+    return { w, here };
+  }).filter(e=>e.here>0);
 }
 function rackRowCount(wines, rowNum){
   let n = 0;
@@ -39,11 +52,16 @@ function rackRowCount(wines, rowNum){
   });
   return n;
 }
-function rackRowWines(wines, rowNum){
-  return wines.filter(w=>{
-    if(Array.isArray(w.slots) && w.slots.length) return w.slots.some(s=>s && s.area==="rack" && s.row===rowNum);
-    return w.location && w.location.area==="rack" && w.location.row===rowNum && w.location.col;
-  });
+function rackRowEntries(wines, rowNum){
+  return wines.map(w=>{
+    let here = 0;
+    if(Array.isArray(w.slots) && w.slots.length){
+      here = w.slots.filter(s=>s && s.area==="rack" && s.row===rowNum).length;
+    } else if(w.location && w.location.area==="rack" && w.location.row===rowNum && w.location.col){
+      here = Math.max(1, w.qty||1);
+    }
+    return { w, here };
+  }).filter(e=>e.here>0);
 }
 // col -> wine occupying that column in a given row
 function rackRowOccupancy(wines, rowNum){
@@ -58,11 +76,16 @@ function rackRowOccupancy(wines, rowNum){
   });
   return map;
 }
-function rackTopWines(wines){
-  return wines.filter(w=>{
-    if(Array.isArray(w.slots) && w.slots.length) return w.slots.some(s=>s && s.area==="rack" && s.section==="top");
-    return w.location && w.location.area==="rack" && w.location.section==="top";
-  });
+function rackTopEntries(wines){
+  return wines.map(w=>{
+    let here = 0;
+    if(Array.isArray(w.slots) && w.slots.length){
+      here = w.slots.filter(s=>s && s.area==="rack" && s.section==="top").length;
+    } else if(w.location && w.location.area==="rack" && w.location.section==="top"){
+      here = w.qty||1;
+    }
+    return { w, here };
+  }).filter(e=>e.here>0);
 }
 
 /* ---------- small shared bits ---------- */
@@ -74,14 +97,21 @@ function FillBar({ frac, color }){
   );
 }
 
-function PositionWineRow({ w, dimmed, highlighted, onOpen, onMove }){
+function PositionWineRow({ w, here, dimmed, highlighted, onOpen, onMove }){
+  const total = w.qty||1;
+  const partial = here!=null && here<total;
   return (
     <div className="card" style={{padding:"10px 12px",marginBottom:8,display:"flex",gap:11,alignItems:"center",
       borderColor:highlighted?"var(--gold)":"var(--line)", background:highlighted?"var(--gold-tint)":"var(--card)", opacity:dimmed?.45:1}}>
       <WineSwatch w={w} size={36}/>
       <div style={{flex:1,minWidth:0}} onClick={()=>onOpen(w.id)}>
         <div style={{fontSize:14.5,fontWeight:600,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{w.producer}{w.cuvee?<span className="cuvee"> · {w.cuvee}</span>:""}</div>
-        <div className="muted" style={{fontSize:12,marginTop:1}}>{w.vintage} · ×{w.qty}{w.location&&w.location.area==="fridge"&&w.location.depth?" · "+(w.location.depth==="front"?"Front":"Back"):""}</div>
+        <div className="muted" style={{fontSize:12,marginTop:1,display:"flex",alignItems:"center",gap:6,flexWrap:"wrap"}}>
+          <span>{w.vintage}</span>
+          <span style={{fontWeight:partial?700:400,color:partial?"var(--amber, #c07a1e)":"inherit"}}>{here!=null?`· ${here}/${total} bottles`:`· ×${total}`}</span>
+          {w.location&&w.location.area==="fridge"&&w.location.depth?<span>· {w.location.depth==="front"?"Front":"Back"}</span>:null}
+          {partial && <span className="chip" style={{padding:"1px 7px",fontSize:10,background:"var(--gold-tint)",color:"#7a571c",fontWeight:700}}>rest elsewhere</span>}
+        </div>
       </div>
       <button className="btn sm ghost" onClick={()=>onMove(w)}>Move</button>
     </div>
@@ -91,7 +121,7 @@ function PositionWineRow({ w, dimmed, highlighted, onOpen, onMove }){
 /* ---------- fridge: rack grid + detail ---------- */
 function FridgeMap({ wines, onOpen, onMove }){
   const [rack, setRack] = React.useState(null);
-  const unassigned = fridgeUnassignedWines(wines);
+  const unassigned = fridgeUnassignedEntries(wines);
 
   return (
     <div>
@@ -115,16 +145,17 @@ function FridgeMap({ wines, onOpen, onMove }){
       </div>
 
       {rack!=null && (()=>{
-        const list = fridgeRackWines(wines, rack);
+        const entries = fridgeRackEntries(wines, rack);
+        const totalHere = entries.reduce((s,e)=>s+e.here,0);
         return (
           <div className="fade-in">
             <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
               <div style={{fontSize:15,fontWeight:700}}>Rack {rack}</div>
-              <span className="muted" style={{fontSize:12.5}}>{list.length} {list.length===1?"wine":"wines"} · {fridgeRackCount(wines,rack)} bottles</span>
+              <span className="muted" style={{fontSize:12.5}}>{entries.length} {entries.length===1?"wine":"wines"} · {totalHere} bottles</span>
             </div>
-            {list.length===0
+            {entries.length===0
               ? <div className="empty" style={{padding:"24px 10px"}}>Nothing assigned to this rack.</div>
-              : list.map(w=><PositionWineRow key={w.id} w={w} onOpen={onOpen} onMove={onMove}/>)}
+              : entries.map(({w,here})=><PositionWineRow key={w.id} w={w} here={here} onOpen={onOpen} onMove={onMove}/>)}
           </div>
         );
       })()}
@@ -132,7 +163,7 @@ function FridgeMap({ wines, onOpen, onMove }){
       {rack==null && unassigned.length>0 && (
         <div className="fade-in" style={{marginTop:4}}>
           <div className="section-label" style={{marginBottom:8}}>In fridge, no rack set</div>
-          {unassigned.map(w=><PositionWineRow key={w.id} w={w} onOpen={onOpen} onMove={onMove}/>)}
+          {unassigned.map(({w,here})=><PositionWineRow key={w.id} w={w} here={here} onOpen={onOpen} onMove={onMove}/>)}
         </div>
       )}
     </div>
@@ -143,7 +174,7 @@ function FridgeMap({ wines, onOpen, onMove }){
 function RackMap({ wines, onOpen, onMove }){
   const [row, setRow] = React.useState(null);
   const [selCol, setSelCol] = React.useState(null);
-  const topWines = rackTopWines(wines);
+  const topWines = rackTopEntries(wines);
   const [showTop, setShowTop] = React.useState(false);
 
   function pickRow(r){ setRow(row===r?null:r); setSelCol(null); setShowTop(false); }
@@ -163,7 +194,7 @@ function RackMap({ wines, onOpen, onMove }){
         <div className="fade-in">
           {topWines.length===0
             ? <div className="empty" style={{padding:"24px 10px"}}>Nothing on the top shelf.</div>
-            : topWines.map(w=><PositionWineRow key={w.id} w={w} onOpen={onOpen} onMove={onMove}/>)}
+            : topWines.map(({w,here})=><PositionWineRow key={w.id} w={w} here={here} onOpen={onOpen} onMove={onMove}/>)}
         </div>
       ) : (<>
         <div className="section-label" style={{marginBottom:8}}>Tap a row (A–L)</div>
@@ -189,12 +220,12 @@ function RackMap({ wines, onOpen, onMove }){
         {row!=null && (()=>{
           const letter = String.fromCharCode(64+row);
           const occ = rackRowOccupancy(wines, row);
-          const list = rackRowWines(wines, row);
+          const entries = rackRowEntries(wines, row);
           return (
             <div className="fade-in">
               <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
                 <div style={{fontSize:15,fontWeight:700}}>Row {letter}</div>
-                <span className="muted" style={{fontSize:12.5}}>{list.length} {list.length===1?"wine":"wines"} · {rackRowCount(wines,row)}/{RACK_CAP_PER_ROW} bottles</span>
+                <span className="muted" style={{fontSize:12.5}}>{entries.length} {entries.length===1?"wine":"wines"} · {rackRowCount(wines,row)}/{RACK_CAP_PER_ROW} bottles</span>
               </div>
               {/* column slot grid — tap a slot to see exactly what's stored there */}
               <div style={{display:"grid",gridTemplateColumns:"repeat(10,1fr)",gap:4,marginBottom:12}}>
@@ -214,15 +245,19 @@ function RackMap({ wines, onOpen, onMove }){
                   );
                 })}
               </div>
-              {selCol!=null && occ[selCol] && (
-                <div style={{marginBottom:4}}>
-                  <PositionWineRow w={occ[selCol]} highlighted onOpen={onOpen} onMove={onMove}/>
-                </div>
-              )}
-              {list.length===0
+              {selCol!=null && occ[selCol] && (()=>{
+                const selW = occ[selCol];
+                const selEntry = entries.find(e=>e.w.id===selW.id);
+                return (
+                  <div style={{marginBottom:4}}>
+                    <PositionWineRow w={selW} here={selEntry?selEntry.here:1} highlighted onOpen={onOpen} onMove={onMove}/>
+                  </div>
+                );
+              })()}
+              {entries.length===0
                 ? <div className="empty" style={{padding:"24px 10px"}}>Nothing assigned to this row.</div>
-                : list.map(w=>(
-                    <PositionWineRow key={w.id} w={w} onOpen={onOpen} onMove={onMove}
+                : entries.map(({w,here})=>(
+                    <PositionWineRow key={w.id} w={w} here={here} onOpen={onOpen} onMove={onMove}
                       highlighted={selCol!=null && occ[selCol]===w} dimmed={selCol!=null && occ[selCol]!==w}/>
                   ))}
             </div>
