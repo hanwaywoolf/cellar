@@ -152,23 +152,36 @@ function _wineColorKey(c){
   if(s.startsWith("red")||s.startsWith("tin")||s.startsWith("rou")) return "red";
   return s;
 }
-function _wineTokens(w){
-  const raw = ((w&&w.producer)||"") + " " + ((w&&w.cuvee)||"");
-  const toks = raw.toLowerCase()
+function _tokenize(str){
+  return ((str||"")+"").toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   // strip accents
     .replace(/[^a-z0-9]+/g," ")                          // punctuation → space
     .split(/\s+/).filter(Boolean)
     .filter(t => t.length>1 && !_WINE_STOP.has(t) && !/^\d{4}$/.test(t)); // drop stopwords & years
-  return new Set(toks);
 }
-// True if the two token sets describe the same wine: the smaller set is mostly
-// contained in the larger. Short names (1–2 distinctive words) must match fully.
-function _tokensSameWine(a, b){
-  if(!a.size || !b.size) return false;
+function _wineTokens(w){
+  return new Set(_tokenize(((w&&w.producer)||"") + " " + ((w&&w.cuvee)||"")));
+}
+// True if two token sets clearly describe the same thing — null means "no signal"
+// (one side has nothing to compare), not a match or a conflict.
+function _setsAgree(a, b){
+  if(!a.size || !b.size) return null;
   let inter = 0; a.forEach(t => { if(b.has(t)) inter++; });
   const min = Math.min(a.size, b.size);
-  if(min <= 2) return inter === min;          // e.g. "Tignanello" — needs an exact hit
-  return inter/min >= 0.6 && inter >= 2;       // longer names: 60%+ overlap
+  return min <= 2 ? inter === min : (inter/min >= 0.6 && inter >= 2);
+}
+// True if the two wines are the same bottle. Producer and cuvée are compared
+// SEPARATELY (not as one merged bag of words) — otherwise a multi-word producer
+// like "Tenuta San Guido" dominates the token count and a scan of "Le Difese"
+// can fuzzy-match an existing "Sassicaia"/"Guidalbero" from the same maker just
+// because most of the words (the producer's) overlap. Either signal disagreeing
+// rules out a match; at least one must positively agree.
+function _tokensSameWine(aProd, aCuvee, bProd, bCuvee){
+  const prodAgree = _setsAgree(aProd, bProd);
+  const cuveeAgree = _setsAgree(aCuvee, bCuvee);
+  if(prodAgree === false) return false;
+  if(cuveeAgree === false) return false;
+  return prodAgree === true || cuveeAgree === true;
 }
 // Expand a single stored location into one entry per bottle (a rack location with
 // qty N spans N consecutive columns; everything else just repeats).
@@ -239,13 +252,16 @@ const Cellar = {
   findDuplicate(w){
     const tv = String(w.vintage ?? "");
     const tcol = _wineColorKey(w.color);
-    const tt = _wineTokens(w);
-    if(!tt.size) return null;
+    const tProd = new Set(_tokenize(w.producer||""));
+    const tCuvee = new Set(_tokenize(w.cuvee||""));
+    if(!tProd.size && !tCuvee.size) return null;
     return load().find(e => {
       if(String(e.vintage ?? "") !== tv) return false;            // vintage must match
       const ecol = _wineColorKey(e.color);
       if(tcol && ecol && tcol !== ecol) return false;             // colour must match if both known
-      return _tokensSameWine(tt, _wineTokens(e));
+      const eProd = new Set(_tokenize(e.producer||""));
+      const eCuvee = new Set(_tokenize(e.cuvee||""));
+      return _tokensSameWine(tProd, tCuvee, eProd, eCuvee);
     });
   },
   // Add or merge: if the same bottle already exists, bump its quantity AND fold
