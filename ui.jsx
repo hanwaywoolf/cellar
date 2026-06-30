@@ -159,10 +159,10 @@ const EditableTitle = ({ className }) => {
   }
   return (
     <h1 className={className} onClick={()=>setEditing(true)} title="Tap to rename your cellar"
-      style={{cursor:"text",display:"inline-flex",alignItems:"center",gap:8}}>
-      <span>{name}</span>
-      <span className="title-edit-hint" aria-hidden="true" style={{display:"inline-grid",placeItems:"center",opacity:.32}}><Ico n="edit" s={15}/></span>
-      {window.APP_VERSION && <span className="build-tag">{window.APP_VERSION}</span>}
+      style={{cursor:"text",display:"flex",alignItems:"center",gap:8,minWidth:0,flexWrap:"nowrap"}}>
+      <span style={{minWidth:0,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{name}</span>
+      <span className="title-edit-hint" aria-hidden="true" style={{display:"inline-grid",placeItems:"center",opacity:.32,flex:"0 0 auto"}}><Ico n="edit" s={15}/></span>
+      {window.APP_VERSION && <span className="build-tag" style={{flex:"0 0 auto"}}>{window.APP_VERSION}</span>}
     </h1>
   );
 };
