@@ -4,6 +4,7 @@ const BK_SCAN_COUNT = "storavin_scans_since_bk";
 const BK_LAST_LOCAL = "storavin_last_bk_local";
 const BK_LAST_DRIVE = "storavin_last_bk_drive";
 const BK_CLIENT_ID  = "storavin_gdrive_client_id";
+const BK_EVER_CONNECTED = "storavin_gdrive_ever_connected";
 const BK_INTERVAL   = 10; // wines scanned between auto-backups
 
 /* --- Google Drive token (in-memory only, never persisted) --- */
@@ -178,7 +179,9 @@ const _ls = {
   getLastDrive:function(){ return _lsGet(BK_LAST_DRIVE,null); },
   setLastDrive:function(v){ _lsSet(BK_LAST_DRIVE,v); },
   getClientId: function(){ return _lsGet(BK_CLIENT_ID,""); },
-  setClientId: function(v){ _lsSet(BK_CLIENT_ID,v.trim()); }
+  setClientId: function(v){ _lsSet(BK_CLIENT_ID,v.trim()); },
+  getEverConnected: function(){ return _lsGet(BK_EVER_CONNECTED,"false")==="true"; },
+  setEverConnected: function(v){ _lsSet(BK_EVER_CONNECTED, v?"true":"false"); }
 };
 
 /* --- BackupManager --- */
@@ -223,8 +226,20 @@ const BackupManager = {
     var id = _ls.getClientId();
     if(!id) throw new Error("Paste your Google Client ID first.");
     await _gSignIn(id);
+    _ls.setEverConnected(true);
     _notify();
     if(typeof SyncManager!=="undefined" && SyncManager.enabled){ SyncManager.start(); SyncManager.syncNow().catch(function(){}); }
+  },
+  // Quietly try to re-acquire a token with no visible Google UI — used on
+  // load/visibility/online so a still-alive Google browser session resumes
+  // sync without the user re-pasting anything or tapping Connect again.
+  trySilentReconnect: async function(){
+    if(_tokenValid()) return true;
+    if(!_ls.getEverConnected()) return false;
+    var id = _ls.getClientId();
+    if(!id) return false;
+    try{ await _gSilentToken(id); _notify(); return true; }
+    catch(e){ return false; }
   },
   disconnectDrive: function(){
     if(_gToken && window.google && window.google.accounts && window.google.accounts.oauth2)
@@ -278,8 +293,8 @@ const SYNC_ENABLED_LS = "storavin_sync_enabled";
 const SYNC_LAST_LS    = "storavin_last_sync";
 let _syncTimer = null, _syncing = false, _syncInterval = null, _syncErr = "";
 
-function _onVis(){ if(document.visibilityState === "visible") SyncManager.syncNow().catch(function(){}); }
-function _onOnline(){ SyncManager.syncNow().catch(function(){}); }
+function _onVis(){ if(document.visibilityState === "visible"){ BackupManager.trySilentReconnect().finally(function(){ SyncManager.syncNow().catch(function(){}); }); } }
+function _onOnline(){ BackupManager.trySilentReconnect().finally(function(){ SyncManager.syncNow().catch(function(){}); }); }
 
 const SyncManager = {
   get enabled(){ return _lsGet(SYNC_ENABLED_LS,"false") === "true"; },
@@ -314,9 +329,13 @@ const SyncManager = {
     _syncing = true; _syncErr = ""; _notify();
     try{
       if(!_tokenValid()){
-        if(!interactive){ _syncErr = "needs_auth"; _syncing = false; _notify(); return; }
-        try { await _gSilentToken(id); }
-        catch(e){ _syncErr = "needs_auth"; throw new Error("needs_auth"); }
+        // background calls get one quiet, no-UI attempt before giving up
+        var reconnected = await BackupManager.trySilentReconnect();
+        if(!reconnected){
+          if(!interactive){ _syncErr = "needs_auth"; _syncing = false; _notify(); return; }
+          try { await _gSilentToken(id); }
+          catch(e){ _syncErr = "needs_auth"; throw new Error("needs_auth"); }
+        }
       }
       var file = await _gFindFile(SYNC_FILE);
       var remote = null;
@@ -347,7 +366,9 @@ const SyncManager = {
   start: function(){
     if(!this.enabled) return;
     this.stop();
-    _syncInterval = setInterval(function(){ SyncManager.syncNow().catch(function(){}); }, 5*60*1000);
+    _syncInterval = setInterval(function(){
+      BackupManager.trySilentReconnect().finally(function(){ SyncManager.syncNow().catch(function(){}); });
+    }, 5*60*1000);
     document.addEventListener("visibilitychange", _onVis);
     window.addEventListener("online", _onOnline);
   },
@@ -366,16 +387,22 @@ function useSync(){
   return SyncManager;
 }
 
-// Auto-start sync on load if the user previously enabled it.
+// Auto-start sync on load if the user previously enabled it. Also fire one
+// quiet, no-popup reconnect attempt right away so an active Google session
+// resumes sync without any tap — if it fails, we just wait for the user.
 (function(){
   try{
     if(SyncManager.enabled){
       SyncManager.start();
-      setTimeout(function(){ SyncManager.syncNow().catch(function(){}); }, 1500);
+      setTimeout(function(){
+        BackupManager.trySilentReconnect().finally(function(){
+          SyncManager.syncNow().catch(function(){});
+        });
+      }, 1500);
     }
   }catch(e){}
 })();
 
-const APP_VERSION = "v27";
+const APP_VERSION = "v28";
 
 Object.assign(window, { BackupManager, useBackup, SyncManager, useSync, APP_VERSION });

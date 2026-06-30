@@ -129,7 +129,7 @@ function BackupScreen({ onClose }){
             <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid var(--line)",display:"flex",alignItems:"center",justifyContent:"space-between",gap:10}}>
               <div className="muted" style={{fontSize:12,display:"flex",alignItems:"center",gap:7}}>
                 <span style={{width:8,height:8,borderRadius:"50%",flex:"0 0 auto",background: sync.syncing?"var(--gold)":(sync.lastError==="needs_auth"?"var(--amber)":"var(--green,#2d9a5e)")}}/>
-                {sync.syncing ? "Syncing…" : sync.lastError==="needs_auth" ? "Tap Sync now to reconnect" : ("Last synced "+fmtDate(sync.lastSync))}
+                {sync.syncing ? "Syncing…" : sync.lastError==="needs_auth" ? "Your Google session expired — tap Sync now to reconnect" : ("Last synced "+fmtDate(sync.lastSync))}
               </div>
               <button className="btn" style={{height:34,fontSize:12.5,whiteSpace:"nowrap"}} onClick={handleSyncNow} disabled={sync.syncing}>
                 <Ico n="refresh" s={14}/>{sync.syncing?"Syncing…":"Sync now"}
