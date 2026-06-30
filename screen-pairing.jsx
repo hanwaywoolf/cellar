@@ -93,7 +93,7 @@ function PairingScreen({ onOpen }){
                     <div className="wine-meta">{w.varietal} · {w.vintage} · {why}</div>
                     <div style={{display:"flex",gap:6,marginTop:6,alignItems:"center",flexWrap:"wrap"}}>
                       <StatusPill w={w}/>
-                      {w.location && <LocationChip loc={w.location} qty={w.qty}/>}
+                      {w.location && <LocationChip loc={w.location} qty={w.qty} slots={w.slots}/>}
                     </div>
                   </div>
                   <span className={"chip "+(i===0?"on":"gold")} style={{fontSize:11.5,padding:"4px 10px"}}>{label}</span>

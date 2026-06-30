@@ -1,9 +1,9 @@
-// Service worker for CoChez Cellar — v20
+// Service worker for CoChez Cellar — v21
 // Network-first fetch. Updates are controlled: new SW waits until
 // the app sends SKIP_WAITING (via the update banner), then activates
 // and the page reloads to get fresh files.
 
-const CACHE = 'cochez-v20';
+const CACHE = 'cochez-v21';
 
 self.addEventListener('install', () => {
   // Do NOT call skipWaiting() here — let the app decide when to update

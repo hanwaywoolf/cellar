@@ -107,6 +107,30 @@ function _addTomb(id){ const t=loadTombs().filter(x=>x.id!==id); t.push({ id, de
 // Local mutations call this; SyncManager (backup.jsx) debounces a push when present.
 function _syncSoon(){ try{ if(window.SyncManager && window.SyncManager.scheduleSync) window.SyncManager.scheduleSync(); }catch(e){} }
 
+// ---------- cellar name (user-editable, persistent, synced) ----------
+const NAME_LS = "cellar_name";
+const NAME_TS_LS = "cellar_name_updatedAt";
+const DEFAULT_CELLAR_NAME = "CoChez Cellar";
+const nameListeners = new Set();
+function getCellarName(){ try{ return (localStorage.getItem(NAME_LS) || "").trim() || DEFAULT_CELLAR_NAME; }catch(e){ return DEFAULT_CELLAR_NAME; } }
+function _nameTs(){ try{ return parseInt(localStorage.getItem(NAME_TS_LS)||"0",10)||0; }catch(e){ return 0; } }
+function setCellarName(n, ts){
+  n = (n||"").trim() || DEFAULT_CELLAR_NAME;
+  try{ localStorage.setItem(NAME_LS, n); localStorage.setItem(NAME_TS_LS, String(ts||Date.now())); }catch(e){}
+  try{ document.title = n; }catch(e){}
+  nameListeners.forEach(fn=>{ try{ fn(n); }catch(e){} });
+  if(!ts) _syncSoon(); // only push to cloud on a genuine local edit
+}
+// keep the name in sync across other open tabs / windows on the same device
+try{ window.addEventListener("storage", e=>{ if(e.key===NAME_LS){ const n=getCellarName(); try{document.title=n;}catch(_){} nameListeners.forEach(fn=>{try{fn(n);}catch(_){}}); } }); }catch(e){}
+function useCellarName(){
+  const [n, setN] = React.useState(getCellarName());
+  React.useEffect(()=>{ const fn=v=>setN(v); nameListeners.add(fn); setN(getCellarName()); return ()=>nameListeners.delete(fn); },[]);
+  return n;
+}
+// reflect any saved custom name in the tab/title on startup
+try{ document.title = getCellarName(); }catch(e){}
+
 const Cellar = {
   all(){ return load(); },
   get(id){ return load().find(w=>w.id===id); },
@@ -135,7 +159,7 @@ const Cellar = {
   remove(id){ _wines = load().filter(w=>w.id!==id); _addTomb(id); persist(); _syncSoon(); },
   _restore(wines){ _wines = wines; persist(); try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){} },
   // Snapshot of the full local state for pushing to the cloud.
-  snapshot(){ return { version:SCHEMA_VERSION, syncedAt:Date.now(), wines:load(), tombstones:loadTombs() }; },
+  snapshot(){ return { version:SCHEMA_VERSION, syncedAt:Date.now(), wines:load(), tombstones:loadTombs(), name:getCellarName(), nameUpdatedAt:_nameTs() }; },
   getTombstones(){ return loadTombs(); },
   // Merge a remote snapshot into local state. Per-wine last-write-wins by
   // updatedAt; deletes propagate via tombstones. Returns the merged snapshot.
@@ -158,6 +182,8 @@ const Cellar = {
     _wines = merged; persist();
     _tombs = tombs; persistTombs();
     try{ localStorage.setItem(DATA_VER_LS, String(SCHEMA_VERSION)); }catch(e){}
+    // adopt the remote cellar name if it was edited more recently than ours
+    if(remote && remote.name && (remote.nameUpdatedAt||0) > _nameTs()){ setCellarName(remote.name, remote.nameUpdatedAt||Date.now()); }
     return Cellar.snapshot();
   },
   openCoravin(id){ Cellar.update(id, { coravin:{ openedAt: Date.now() } }); },
@@ -430,4 +456,4 @@ All four are 4-digit years and MUST satisfy drinkFrom <= peakFrom <= peakTo <= d
   return patch;
 }
 
-Object.assign(window, { Cellar, useCellar, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, peakCore, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });
+Object.assign(window, { Cellar, useCellar, getCellarName, setCellarName, useCellarName, DEFAULT_CELLAR_NAME, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, peakCore, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });

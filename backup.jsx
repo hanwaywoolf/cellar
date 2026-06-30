@@ -376,6 +376,6 @@ function useSync(){
   }catch(e){}
 })();
 
-const APP_VERSION = "v20";
+const APP_VERSION = "v21";
 
 Object.assign(window, { BackupManager, useBackup, SyncManager, useSync, APP_VERSION });

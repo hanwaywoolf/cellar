@@ -86,7 +86,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
     <>
       <div className="topbar">
         <div>
-          <h1>CoChez Cellar</h1>
+          <EditableTitle/>
           <div className="sub">{totalBottles} bottles · {fmt$(totalValue)} value</div>
         </div>
         <div style={{display:"flex",gap:8,alignItems:"center"}}>
@@ -155,6 +155,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
             </div>
           ) : viewMode==="table" ? (
             /* ---- TABLE VIEW ---- */
+            <div className="wine-table-scroll">
             <table className="wine-table">
               <thead>
                 <tr>
@@ -185,12 +186,13 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
                       <RatingPills w={w} max={2}/>
                     </td>
                     <td style={{textAlign:"right",fontWeight:600,fontSize:14,whiteSpace:"nowrap"}}>{fmt$(w.valueEst)}</td>
-                    <td>{w.location ? <LocationChip loc={w.location} qty={w.qty}/> : <span className="muted" style={{fontSize:11}}>—</span>}</td>
+                    <td>{w.location ? <LocationChip loc={w.location} qty={w.qty} slots={w.slots}/> : <span className="muted" style={{fontSize:11}}>—</span>}</td>
                     <td style={{textAlign:"right",color:"var(--muted)",fontSize:13}}>×{w.qty}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           ) : (
             /* ---- LIST / CARD VIEW ---- */
             <div className="ipad-list">
@@ -203,7 +205,7 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
                     <div style={{display:"flex",gap:7,marginTop:6,alignItems:"center",flexWrap:"wrap"}}>
                       <StatusPill w={w}/>
                       <RatingPills w={w} max={2}/>
-                      {w.location && <LocationChip loc={w.location} qty={w.qty}/>}
+                      {w.location && <LocationChip loc={w.location} qty={w.qty} slots={w.slots}/>}
                       {coravinInfo(w) && <span className="chip gold" style={{padding:"3px 9px",fontSize:11.5}}><Ico n="clock" s={12}/>{coravinText(w)}</span>}
                     </div>
                   </div>

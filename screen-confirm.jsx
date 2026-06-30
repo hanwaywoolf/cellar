@@ -101,9 +101,14 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
           </div>
 
           {/* storage location */}
-          <div className="section-label" style={{margin:"10px 0 8px"}}>Where are you storing this?</div>
+          <div className="section-label" style={{margin:"10px 0 8px"}}>{qty>1?`Where are you storing these ${qty} bottles?`:"Where are you storing this?"}</div>
           <div style={{marginBottom:14}}>
-            <LocationPicker value={draft.location} onChange={v=>field("location",v)} wines={Cellar.all()}/>
+            <LocationPicker qty={qty}
+              value={qty>1 ? (draft.slots||[]) : draft.location}
+              onChange={v=>{
+                if(qty>1){ const arr=Array.isArray(v)?v:(v?[v]:[]); field("slots",arr); field("location",arr[0]||null); }
+                else { field("location",v); field("slots",null); }
+              }} wines={Cellar.all()}/>
           </div>
 
           {/* pairings */}

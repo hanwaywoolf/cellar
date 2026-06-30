@@ -4,6 +4,37 @@ const BREAKPOINT = 768; // iPad mini portrait = 768px
 
 const EMPTY_FILTERS_A = { color:"All", country:null, region:null, cls:null, varietal:null, vintage:null, status:null, storage:null };
 
+/* Shows the running version and a one-time "Updated to vXX" toast after the app
+   reloads onto a new build, so the version is always trackable. All logic lives
+   inside the component (lazy init reads the version + last-seen at first render;
+   the new version is written back in an effect) to avoid cross-scope/timing
+   issues in the bundled build. */
+let _versionHandled = false;
+function VersionWatcher(){
+  const [show, setShow] = React.useState(()=>{
+    if(_versionHandled) return false;
+    const v = window.APP_VERSION || "";
+    if(!v) return false;
+    let seen = null;
+    try{ seen = localStorage.getItem("cellar_seen_version"); }catch(e){}
+    return !!(seen && seen !== v);
+  });
+  React.useEffect(()=>{
+    _versionHandled = true;
+    const v = window.APP_VERSION || "";
+    try{ if(v) localStorage.setItem("cellar_seen_version", v); }catch(e){}
+    const badge = document.getElementById("build-badge");
+    if(badge && v) badge.textContent = "BUILD "+v+" · tap to hide";
+  },[]);
+  React.useEffect(()=>{ if(show){ const t=setTimeout(()=>setShow(false), 8000); return ()=>clearTimeout(t); } },[show]);
+  if(!show) return null;
+  return (
+    <div className="version-toast" onClick={()=>setShow(false)}>
+      <span className="dot"/>Updated to <strong>{window.APP_VERSION||""}</strong>
+    </div>
+  );
+}
+
 function AdaptiveApp(){
   const [isWide, setIsWide] = React.useState(()=> window.innerWidth >= BREAKPOINT);
 
@@ -14,7 +45,10 @@ function AdaptiveApp(){
     return ()=> mq.removeEventListener("change", handler);
   },[]);
 
-  return isWide ? <IPadAppInner/> : <PhoneAppInner/>;
+  return (<>
+    {isWide ? <IPadAppInner/> : <PhoneAppInner/>}
+    <VersionWatcher/>
+  </>);
 }
 
 /* ---- Phone layout (from app-main.jsx) ---- */

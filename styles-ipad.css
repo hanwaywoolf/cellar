@@ -92,6 +92,7 @@
   background:var(--bg);
 }
 .main-area .topbar h1{ font-size:30px; }
+.main-area .topbar .title-edit{ font-size:30px; max-width:min(60vw,460px); }
 
 /* ---------- Detail side panel ---------- */
 .detail-panel{
@@ -124,7 +125,28 @@
 }
 
 /* ---------- Wine table ---------- */
-.wine-table{ width:100%; border-collapse:collapse; }
+/* horizontal scroll wrapper — full-bleed so the frozen column hugs the edge */
+.wine-table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -28px; padding:0 28px; }
+.wine-table-scroll::-webkit-scrollbar{ height:8px; }
+.wine-table-scroll::-webkit-scrollbar-thumb{ background:var(--line2); border-radius:30px; }
+.wine-table{ width:100%; min-width:880px; border-collapse:separate; border-spacing:0; }
+/* freeze the swatch (col 1) + wine-name (col 2) so they persist while scrolling */
+.wine-table th:nth-child(1), .wine-table td:nth-child(1){
+  position:sticky; left:0; z-index:2; background:var(--bg);
+}
+.wine-table th:nth-child(2), .wine-table td:nth-child(2){
+  position:sticky; left:42px; z-index:2; background:var(--bg);
+}
+.wine-table thead th:nth-child(1), .wine-table thead th:nth-child(2){ z-index:3; }
+/* keep row hover / selected tints on the frozen cells (opaque equivalents) */
+.wine-table tr:hover td:nth-child(1), .wine-table tr:hover td:nth-child(2){ background:#f1eff0; }
+.wine-table tr.selected td:nth-child(1), .wine-table tr.selected td:nth-child(2){ background:var(--wine-tint); }
+/* subtle edge line at the freeze boundary, shown once scrolled */
+.wine-table th:nth-child(2)::after, .wine-table td:nth-child(2)::after{
+  content:""; position:absolute; top:0; right:0; bottom:0; width:14px; pointer-events:none;
+  transform:translateX(100%);
+  background:linear-gradient(90deg, rgba(26,29,35,.07), rgba(26,29,35,0));
+}
 .wine-table th{
   text-align:left; font-size:10.5px; font-weight:600;
   letter-spacing:1.2px; text-transform:uppercase; color:var(--muted);

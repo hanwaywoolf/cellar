@@ -137,4 +137,31 @@ const Sheet = ({ onClose, children }) => {
   );
 };
 
-Object.assign(window, { Ico, WineSwatch, Bottle, StatusPill, DrinkMeter, Trait, ColorDot, RatingPills, QtyStepper, Sheet });
+// editable cellar title — tap the name to rename; persists + syncs across devices
+const EditableTitle = ({ className }) => {
+  const name = useCellarName();
+  const [editing, setEditing] = React.useState(false);
+  const [val, setVal] = React.useState(name);
+  const ref = React.useRef(null);
+  React.useEffect(()=>{ if(editing){ setVal(getCellarName()); const t=setTimeout(()=>{ if(ref.current){ ref.current.focus(); ref.current.select(); } },20); return ()=>clearTimeout(t); } },[editing]);
+  function commit(){ setEditing(false); setCellarName(val); }
+  function cancel(){ setEditing(false); setVal(getCellarName()); }
+  if(editing){
+    return (
+      <input ref={ref} className={"title-edit "+(className||"")} value={val} maxLength={36}
+        aria-label="Cellar name"
+        onChange={e=>setVal(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e=>{ if(e.key==="Enter"){ e.preventDefault(); commit(); } else if(e.key==="Escape"){ e.preventDefault(); cancel(); } }} />
+    );
+  }
+  return (
+    <h1 className={className} onClick={()=>setEditing(true)} title="Tap to rename your cellar"
+      style={{cursor:"text",display:"inline-flex",alignItems:"center",gap:8}}>
+      <span>{name}</span>
+      <span className="title-edit-hint" aria-hidden="true" style={{display:"inline-grid",placeItems:"center",opacity:.32}}><Ico n="edit" s={15}/></span>
+    </h1>
+  );
+};
+
+Object.assign(window, { Ico, WineSwatch, Bottle, StatusPill, DrinkMeter, Trait, ColorDot, RatingPills, QtyStepper, Sheet, EditableTitle });
