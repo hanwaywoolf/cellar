@@ -5,6 +5,7 @@ const BK_LAST_LOCAL = "storavin_last_bk_local";
 const BK_LAST_DRIVE = "storavin_last_bk_drive";
 const BK_CLIENT_ID  = "storavin_gdrive_client_id";
 const BK_EVER_CONNECTED = "storavin_gdrive_ever_connected";
+const BK_RECONNECT_DISMISS = "storavin_reconnect_dismissed_date";
 const BK_INTERVAL   = 10; // wines scanned between auto-backups
 
 /* --- Google Drive token (in-memory only, never persisted) --- */
@@ -181,7 +182,9 @@ const _ls = {
   getClientId: function(){ return _lsGet(BK_CLIENT_ID,""); },
   setClientId: function(v){ _lsSet(BK_CLIENT_ID,v.trim()); },
   getEverConnected: function(){ return _lsGet(BK_EVER_CONNECTED,"false")==="true"; },
-  setEverConnected: function(v){ _lsSet(BK_EVER_CONNECTED, v?"true":"false"); }
+  setEverConnected: function(v){ _lsSet(BK_EVER_CONNECTED, v?"true":"false"); },
+  getReconnectDismissDate: function(){ return _lsGet(BK_RECONNECT_DISMISS, ""); },
+  setReconnectDismissDate: function(v){ _lsSet(BK_RECONNECT_DISMISS, v); }
 };
 
 /* --- BackupManager --- */
@@ -241,6 +244,32 @@ const BackupManager = {
     try{ await _gSilentToken(id); _notify(); return true; }
     catch(e){ return false; }
   },
+  // One-tap reconnect using the already-saved Client ID — shows Google's normal
+  // account UI since this only ever runs from a real tap (the reconnect banner
+  // or the Backup screen), never automatically.
+  quickReconnect: async function(){
+    var id = _ls.getClientId();
+    if(!id) throw new Error("no_client_id");
+    await this.connectDrive(id);
+    if(typeof SyncManager!=="undefined") await SyncManager.syncNow(true);
+  },
+  // Should we show the small in-app "reconnect to sync" banner right now?
+  // Capped to once per calendar day so closing/reopening the app doesn't nag —
+  // but if you dismiss it and a later sync attempt still fails (e.g. mid-session
+  // token expiry while you're actively adding wines), today's dismissal doesn't
+  // re-arm until tomorrow; use the Backup screen's "Sync now" any time in between.
+  shouldShowReconnectPrompt: function(){
+    if(typeof SyncManager==="undefined" || !SyncManager.enabled) return false;
+    if(this.driveConnected) return false;
+    if(SyncManager.lastError !== "needs_auth") return false;
+    if(!_ls.getClientId()) return false;
+    var today = new Date().toISOString().slice(0,10);
+    return _ls.getReconnectDismissDate() !== today;
+  },
+  dismissReconnectPrompt: function(){
+    _ls.setReconnectDismissDate(new Date().toISOString().slice(0,10));
+    _notify();
+  },
   disconnectDrive: function(){
     if(_gToken && window.google && window.google.accounts && window.google.accounts.oauth2)
       window.google.accounts.oauth2.revoke(_gToken);
@@ -293,8 +322,8 @@ const SYNC_ENABLED_LS = "storavin_sync_enabled";
 const SYNC_LAST_LS    = "storavin_last_sync";
 let _syncTimer = null, _syncing = false, _syncInterval = null, _syncErr = "";
 
-function _onVis(){ if(document.visibilityState === "visible"){ BackupManager.trySilentReconnect().finally(function(){ SyncManager.syncNow().catch(function(){}); }); } }
-function _onOnline(){ BackupManager.trySilentReconnect().finally(function(){ SyncManager.syncNow().catch(function(){}); }); }
+function _onVis(){ if(document.visibilityState === "visible") SyncManager.syncNow().catch(function(){}); }
+function _onOnline(){ SyncManager.syncNow().catch(function(){}); }
 
 const SyncManager = {
   get enabled(){ return _lsGet(SYNC_ENABLED_LS,"false") === "true"; },
@@ -318,10 +347,13 @@ const SyncManager = {
   // Pull the shared file, merge it into local state, push the merged result back.
   // `interactive` MUST only be true when called directly from a user tap. A
   // background/auto sync (page load, visibility, online, debounced push) must
-  // never trigger Google's sign-in UI — doing so was what threw up a Google
-  // login screen on every refresh. Without a valid in-memory token we simply
-  // mark needs_auth and bail; the user re-establishes a token from the Backup
-  // screen's "Connect Drive" button, after which sync resumes for the session.
+  // never trigger Google's sign-in UI — on a standalone/installed PWA, Google's
+  // "silent" token mode is not reliably silent (cookie partitioning means it can
+  // fall back to the account-chooser screen), so attempting it automatically
+  // surfaces that picker on every app open. Without a valid in-memory token we
+  // simply mark needs_auth and bail; the user re-establishes a token from the
+  // Backup screen's "Sync now"/"Connect Drive" button (a real tap), after which
+  // sync resumes for the rest of the session.
   syncNow: async function(interactive){
     if(_syncing) return;
     var id = _ls.getClientId();
@@ -329,13 +361,9 @@ const SyncManager = {
     _syncing = true; _syncErr = ""; _notify();
     try{
       if(!_tokenValid()){
-        // background calls get one quiet, no-UI attempt before giving up
-        var reconnected = await BackupManager.trySilentReconnect();
-        if(!reconnected){
-          if(!interactive){ _syncErr = "needs_auth"; _syncing = false; _notify(); return; }
-          try { await _gSilentToken(id); }
-          catch(e){ _syncErr = "needs_auth"; throw new Error("needs_auth"); }
-        }
+        if(!interactive){ _syncErr = "needs_auth"; _syncing = false; _notify(); return; }
+        try { await _gSilentToken(id); }
+        catch(e){ _syncErr = "needs_auth"; throw new Error("needs_auth"); }
       }
       var file = await _gFindFile(SYNC_FILE);
       var remote = null;
@@ -366,9 +394,7 @@ const SyncManager = {
   start: function(){
     if(!this.enabled) return;
     this.stop();
-    _syncInterval = setInterval(function(){
-      BackupManager.trySilentReconnect().finally(function(){ SyncManager.syncNow().catch(function(){}); });
-    }, 5*60*1000);
+    _syncInterval = setInterval(function(){ SyncManager.syncNow().catch(function(){}); }, 5*60*1000);
     document.addEventListener("visibilitychange", _onVis);
     window.addEventListener("online", _onOnline);
   },
@@ -387,22 +413,16 @@ function useSync(){
   return SyncManager;
 }
 
-// Auto-start sync on load if the user previously enabled it. Also fire one
-// quiet, no-popup reconnect attempt right away so an active Google session
-// resumes sync without any tap — if it fails, we just wait for the user.
+// Auto-start sync on load if the user previously enabled it.
 (function(){
   try{
     if(SyncManager.enabled){
       SyncManager.start();
-      setTimeout(function(){
-        BackupManager.trySilentReconnect().finally(function(){
-          SyncManager.syncNow().catch(function(){});
-        });
-      }, 1500);
+      setTimeout(function(){ SyncManager.syncNow().catch(function(){}); }, 1500);
     }
   }catch(e){}
 })();
 
-const APP_VERSION = "v28";
+const APP_VERSION = "v30";
 
 Object.assign(window, { BackupManager, useBackup, SyncManager, useSync, APP_VERSION });

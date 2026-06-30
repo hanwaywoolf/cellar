@@ -33,6 +33,54 @@ function VersionWatcher(){
   );
 }
 
+/* Small, non-blocking banner asking to restore the Drive connection — shown at
+   most once per calendar day (see BackupManager.shouldShowReconnectPrompt).
+   Tapping Reconnect runs the normal Google sign-in (a real user gesture, so no
+   surprise popups); tapping the x just silences it until tomorrow. Local data
+   is never at risk either way — the cellar is always saved on-device; this only
+   affects whether other devices see today's changes yet. */
+function ReconnectBanner(){
+  const bk = useBackup();
+  const sync = useSync();
+  const [show, setShow] = React.useState(()=>bk.shouldShowReconnectPrompt());
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState("");
+
+  React.useEffect(()=>{
+    setShow(bk.shouldShowReconnectPrompt());
+  },[sync.lastError, bk.driveConnected]);
+
+  if(!show) return null;
+
+  async function reconnect(){
+    setBusy(true); setErr("");
+    try{ await bk.quickReconnect(); setShow(false); }
+    catch(e){ setErr("Couldn't reconnect — try again from Backup & Restore."); }
+    finally{ setBusy(false); }
+  }
+  function dismiss(){ bk.dismissReconnectPrompt(); setShow(false); }
+
+  return (
+    <div style={{
+      position:"fixed", left:"50%", transform:"translateX(-50%)",
+      top:"calc(var(--safe-top, 0px) + 12px)", zIndex:99998,
+      display:"flex", alignItems:"center", gap:10,
+      background:"#1a1a1a", color:"#f3e6cf",
+      font:"600 12.5px/1.3 system-ui,sans-serif",
+      padding:"9px 10px 9px 15px", borderRadius:30,
+      boxShadow:"0 6px 24px rgba(0,0,0,.35)", maxWidth:"calc(100vw - 24px)"
+    }}>
+      <span style={{whiteSpace:"nowrap"}}>{err || "Sync paused — reconnect Drive?"}</span>
+      <button onClick={reconnect} disabled={busy} style={{flex:"0 0 auto",background:"#f3e6cf",color:"#1a1a1a",border:"none",borderRadius:20,padding:"6px 13px",fontWeight:700,fontSize:12}}>
+        {busy?"…":"Reconnect"}
+      </button>
+      <button onClick={dismiss} aria-label="Dismiss" style={{flex:"0 0 auto",width:26,height:26,borderRadius:"50%",background:"rgba(255,255,255,.12)",border:"none",color:"#f3e6cf",display:"grid",placeItems:"center"}}>
+        <Ico n="x" s={13}/>
+      </button>
+    </div>
+  );
+}
+
 function AdaptiveApp(){
   const [isWide, setIsWide] = React.useState(()=> window.innerWidth >= BREAKPOINT);
 
@@ -46,6 +94,7 @@ function AdaptiveApp(){
   return (<>
     {isWide ? <IPadAppInner/> : <PhoneAppInner/>}
     <VersionWatcher/>
+    <ReconnectBanner/>
   </>);
 }
 
