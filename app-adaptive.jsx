@@ -23,8 +23,6 @@ function VersionWatcher(){
     _versionHandled = true;
     const v = window.APP_VERSION || "";
     try{ if(v) localStorage.setItem("cellar_seen_version", v); }catch(e){}
-    const badge = document.getElementById("build-badge");
-    if(badge && v) badge.textContent = "BUILD "+v+" · tap to hide";
   },[]);
   React.useEffect(()=>{ if(show){ const t=setTimeout(()=>setShow(false), 8000); return ()=>clearTimeout(t); } },[show]);
   if(!show) return null;

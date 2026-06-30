@@ -160,6 +160,7 @@ const EditableTitle = ({ className }) => {
       style={{cursor:"text",display:"inline-flex",alignItems:"center",gap:8}}>
       <span>{name}</span>
       <span className="title-edit-hint" aria-hidden="true" style={{display:"inline-grid",placeItems:"center",opacity:.32}}><Ico n="edit" s={15}/></span>
+      {window.APP_VERSION && <span className="build-tag">{window.APP_VERSION}</span>}
     </h1>
   );
 };
