@@ -24,6 +24,19 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
   const F = (props) => <CField {...props} draft={draft} field={field}/>;
   const named = (draft.producer||draft.cuvee);
 
+  // Is this wine already in the cellar? Match fuzzily on the live draft so a
+  // re-scan (or manual entry) of an existing bottle bumps quantity instead of
+  // creating a duplicate line. Recomputes as the identity fields are edited.
+  const existing = React.useMemo(
+    ()=> Cellar.findDuplicate(draft),
+    [draft.producer, draft.cuvee, draft.vintage, draft.color]
+  );
+  const exSlots = existing ? getSlots(existing) : [];
+  const exWhere = exSlots.length
+    ? (exSlots.length>1 ? summarizeSlots(exSlots, true) : locationLabel(exSlots[0], existing.qty))
+    : null;
+  const exQty = existing ? (existing.qty||1) : 0;
+
   return (
     <>
       <div className="topbar" style={{paddingTop:"calc(var(--safe-top) + 12px)"}}>
@@ -49,6 +62,15 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
               </div>
             </div>
           </div>
+
+          {existing && (
+            <div className="card" style={{padding:"12px 13px",marginBottom:12,background:"#f6e9d6",borderColor:"#c9962f66",display:"flex",gap:10,alignItems:"flex-start"}}>
+              <span style={{color:"#9a6f1c",flex:"0 0 auto",marginTop:1}}><Ico n="check" s={18}/></span>
+              <div style={{fontSize:12.5,color:"#5f4410",lineHeight:1.5}}>
+                <b>Already in your cellar.</b> You have {exQty} {exQty===1?"bottle":"bottles"}{exWhere?<> stored at <b>{exWhere}</b></>:" (no location set yet)"}. Adding {qty>1?`these ${qty}`:"this"} bumps the count to <b>{exQty+qty}</b> — it won’t create a duplicate.
+              </div>
+            </div>
+          )}
 
           {conf!=null && conf<70 && (thumb||ocr) && (
             <div className="card" style={{padding:"10px 13px",display:"flex",gap:9,alignItems:"center",marginBottom:12,background:"var(--gold-tint)",borderColor:"transparent"}}>
@@ -101,9 +123,10 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
           </div>
 
           {/* storage location */}
-          <div className="section-label" style={{margin:"10px 0 8px"}}>{qty>1?`Where are you storing these ${qty} bottles?`:"Where are you storing this?"}</div>
+          <div className="section-label" style={{margin:"10px 0 8px"}}>{existing ? (qty>1?`Where are these ${qty} new bottles going?`:"Where is this new bottle going?") : (qty>1?`Where are you storing these ${qty} bottles?`:"Where are you storing this?")}</div>
           <div style={{marginBottom:14}}>
             <LocationPicker qty={qty}
+              highlightSlots={existing ? exSlots : null}
               value={qty>1 ? (draft.slots||[]) : draft.location}
               onChange={v=>{
                 if(qty>1){ const arr=Array.isArray(v)?v:(v?[v]:[]); field("slots",arr); field("location",arr[0]||null); }
@@ -166,7 +189,7 @@ function ConfirmForm({ draft, field, qty, setQty, thumb, ocr, conf, onCancel, on
           <QtyStepper value={qty} onChange={v=>setQty(Math.max(1,v))} min={1}/>
         </div>
         <button className="btn primary block" style={{flex:1,height:52}} onClick={onSave} disabled={!named}>
-          <Ico n="plus" s={18}/>Add {qty>1?`${qty} bottles`:"to cellar"}
+          <Ico n={existing?"check":"plus"} s={18}/>{existing ? `Add to existing (${exQty}→${exQty+qty})` : `Add ${qty>1?`${qty} bottles`:"to cellar"}`}
         </button>
       </div>
     </>

@@ -131,26 +131,97 @@ function useCellarName(){
 // reflect any saved custom name in the tab/title on startup
 try{ document.title = getCellarName(); }catch(e){}
 
+// ---------- fuzzy bottle identity (for dedup on re-scan) ----------
+// Generic words that don't help tell two producers/cuvées apart. Vintage and
+// colour are matched separately, so dropping these makes the token compare focus
+// on the distinctive name (e.g. "ardanza", not "bodegas"/"reserva").
+const _WINE_STOP = new Set([
+  "the","a","of","and","y","e","et","de","del","della","di","du","des","da","do","la","le","el","los","las",
+  "sa","sl","srl","inc","ltd","co","cie","and sons","sons",
+  "bodega","bodegas","domaine","domaines","chateau","château","weingut","tenuta","azienda","agricola",
+  "cantina","cantine","quinta","castello","clos","mas","cave","caves","cellars","cellar","winery","wines",
+  "wine","estate","estates","vineyard","vineyards","vigneron","vignobles","reserva","reserve","gran",
+  "grande","riserva","vino","vin","red","white","rose","rosado","blanc","tinto"
+]);
+function _wineColorKey(c){
+  const s=(c||"").trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"");
+  if(!s) return "";
+  if(s.startsWith("ros")) return "rose";
+  if(s.startsWith("spark")||s.includes("champ")) return "sparkling";
+  if(s.startsWith("wh")||s.startsWith("bla")) return "white";
+  if(s.startsWith("red")||s.startsWith("tin")||s.startsWith("rou")) return "red";
+  return s;
+}
+function _wineTokens(w){
+  const raw = ((w&&w.producer)||"") + " " + ((w&&w.cuvee)||"");
+  const toks = raw.toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")   // strip accents
+    .replace(/[^a-z0-9]+/g," ")                          // punctuation → space
+    .split(/\s+/).filter(Boolean)
+    .filter(t => t.length>1 && !_WINE_STOP.has(t) && !/^\d{4}$/.test(t)); // drop stopwords & years
+  return new Set(toks);
+}
+// True if the two token sets describe the same wine: the smaller set is mostly
+// contained in the larger. Short names (1–2 distinctive words) must match fully.
+function _tokensSameWine(a, b){
+  if(!a.size || !b.size) return false;
+  let inter = 0; a.forEach(t => { if(b.has(t)) inter++; });
+  const min = Math.min(a.size, b.size);
+  if(min <= 2) return inter === min;          // e.g. "Tignanello" — needs an exact hit
+  return inter/min >= 0.6 && inter >= 2;       // longer names: 60%+ overlap
+}
+// Expand a single stored location into one entry per bottle (a rack location with
+// qty N spans N consecutive columns; everything else just repeats).
+function _expandLoc(loc, qty){
+  qty = Math.max(1, qty||1);
+  if(!loc || !loc.area) return [];
+  if(loc.area==="rack" && loc.row && loc.col){
+    const out=[]; for(let i=0;i<qty;i++){ const c=loc.col+i; if(c>=1 && c<=10) out.push({area:"rack",row:loc.row,col:c}); } return out;
+  }
+  return Array.from({length:qty}, ()=>({ ...loc }));
+}
+// Normalize any wine/draft to an explicit list of bottle slots.
+function _slotsOf(w){
+  if(!w) return [];
+  if(Array.isArray(w.slots) && w.slots.length) return w.slots.filter(Boolean);
+  if(w.location) return _expandLoc(w.location, w.qty||1);
+  return [];
+}
+
 const Cellar = {
   all(){ return load(); },
   get(id){ return load().find(w=>w.id===id); },
   add(w){ const item = { id:uid(), addedAt:Date.now(), updatedAt:Date.now(), qty:1, photo:null, currency:"GBP", ...w }; if(item.updatedAt==null) item.updatedAt=Date.now(); _wines=[item, ...load()]; persist(); Cellar.scheduleAutoBackup(); _syncSoon(); return item; },
-  // Find an existing wine that matches producer+cuvée+vintage+color (case-insensitive)
+  // Find an existing wine that is the SAME bottle as `w`. Two scans of one wine
+  // rarely produce byte-identical text (gold foil, "S.A." suffixes, an extra word
+  // in the cuvée), so we match fuzzily: same vintage, compatible colour, and a
+  // strong token overlap on producer+cuvée. This is what stops a re-scanned
+  // Ardanza 2009 from landing as a second line.
   findDuplicate(w){
-    const norm = s => (s||"").trim().toLowerCase();
-    return load().find(e =>
-      norm(e.producer)===norm(w.producer) &&
-      norm(e.cuvee)===norm(w.cuvee) &&
-      e.vintage==w.vintage &&
-      norm(e.color)===norm(w.color)
-    );
+    const tv = String(w.vintage ?? "");
+    const tcol = _wineColorKey(w.color);
+    const tt = _wineTokens(w);
+    if(!tt.size) return null;
+    return load().find(e => {
+      if(String(e.vintage ?? "") !== tv) return false;            // vintage must match
+      const ecol = _wineColorKey(e.color);
+      if(tcol && ecol && tcol !== ecol) return false;             // colour must match if both known
+      return _tokensSameWine(tt, _wineTokens(e));
+    });
   },
-  // Add or merge: if exact bottle exists, increment qty and return existing; otherwise add new
+  // Add or merge: if the same bottle already exists, bump its quantity AND fold
+  // in the storage spots chosen for the new bottles (so they're remembered next
+  // to the others); otherwise add a new record.
   addOrMerge(w, addQty=1){
     const existing = Cellar.findDuplicate(w);
     if(existing){
-      Cellar.setQty(existing.id, (existing.qty||1) + addQty);
-      return { ...Cellar.get(existing.id), merged:true };
+      const exSlots = _slotsOf(existing);
+      const addSlots = _slotsOf({ slots:w.slots, location:w.location, qty:addQty });
+      const combined = exSlots.concat(addSlots);
+      const patch = { qty:(existing.qty||1) + addQty };
+      if(combined.length){ patch.slots = combined; patch.location = combined[0]; }
+      Cellar.update(existing.id, patch);
+      return { ...Cellar.get(existing.id), merged:true, addedQty:addQty, prevQty:(existing.qty||1) };
     }
     return { ...Cellar.add({ ...w, qty:addQty }), merged:false };
   },

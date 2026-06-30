@@ -117,7 +117,7 @@ function LocationChip({ loc, qty, slots, size, w }){
 }
 
 /* ---------- main picker ---------- */
-function LocationPicker({ value, onChange, wines, qty=1 }){
+function LocationPicker({ value, onChange, wines, qty=1, highlightSlots }){
   const multi = (qty||1) > 1;
   // normalize incoming value → slot array
   const slots = React.useMemo(()=> Array.isArray(value) ? value.filter(Boolean) : (value ? [value] : []), [value]);
@@ -197,6 +197,19 @@ function LocationPicker({ value, onChange, wines, qty=1 }){
     return {f,r};
   },[wines]);
 
+  /* spots where this SAME wine's other bottles already live — drawn in gold so
+     the user can place the new bottles right next to them. */
+  const hl = React.useMemo(()=>{
+    const f={}, r={};
+    (highlightSlots||[]).forEach(s=>{
+      if(!s||!s.area) return;
+      if(s.area==="fridge"&&s.rack){ const k="r"+s.rack; f[k]=(f[k]||0)+1; }
+      if(s.area==="rack"&&s.row&&s.col){ r[s.row+"-"+s.col]=true; }
+    });
+    return {f,r};
+  },[highlightSlots]);
+  const hasHl = (highlightSlots||[]).some(s=>s&&s.area);
+
   /* progress banner for multi-bottle scans */
   const ProgressNote = ({verb})=> multi ? (
     <div style={{display:"flex",alignItems:"center",gap:8,background:"var(--gold-tint)",border:"1px solid transparent",borderRadius:10,padding:"8px 11px",marginBottom:10}}>
@@ -211,6 +224,12 @@ function LocationPicker({ value, onChange, wines, qty=1 }){
 
   return (
     <div>
+      {hasHl && (
+        <div style={{display:"flex",alignItems:"center",gap:8,background:"#8b5e340e",border:"1px solid #8b5e3433",borderRadius:10,padding:"8px 11px",marginBottom:10}}>
+          <span style={{width:12,height:12,borderRadius:4,background:"#fff",border:"2px solid #c9962f",flex:"0 0 auto"}}/>
+          <span style={{fontSize:12,color:"#7a571c",fontWeight:600,lineHeight:1.3}}>Gold-ringed spots hold your other bottles of this wine — place these alongside them.</span>
+        </div>
+      )}
       {/* area cards */}
       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:area?14:0}}>
         {STORAGE_AREAS.map(a=>{
@@ -243,15 +262,17 @@ function LocationPicker({ value, onChange, wines, qty=1 }){
               const here = multi ? slots.filter(s=>s.area==="fridge"&&s.rack===n).length : (value?.rack===n?1:0);
               const on = here>0;
               const cnt=occ.f["r"+n]||0;
+              const gold=hl.f["r"+n]||0;
               const full = multi && !on && slots.length>=qty;
               return (
                 <button key={n} onClick={()=>multi?bumpRack(n):setRackSingle(n)} disabled={full}
                   style={{height:46,borderRadius:10,fontSize:16,fontWeight:700,position:"relative",
                     background:on?"#2a6fdb":"var(--card)",color:on?"#fff":full?"var(--faint)":"var(--ink)",
-                    border:"1.5px solid "+(on?"#2a6fdb":"var(--line2)"),opacity:full?.5:1,
+                    border:"1.5px solid "+(on?"#2a6fdb":gold?"#c9962f":"var(--line2)"),opacity:full?.5:1,
+                    boxShadow:gold&&!on?"0 0 0 2px #c9962f55 inset":"none",
                     display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
                   {n}
-                  {cnt>0&&!on&&<span style={{fontSize:8.5,color:"var(--muted)",marginTop:-2}}>{cnt}</span>}
+                  {cnt>0&&!on&&<span style={{fontSize:8.5,color:gold?"#9a6f1c":"var(--muted)",marginTop:-2}}>{cnt}</span>}
                   {multi&&here>0&&<span style={{position:"absolute",top:3,right:5,fontSize:9.5,fontWeight:800}}>×{here}</span>}
                 </button>
               );
@@ -323,16 +344,18 @@ function LocationPicker({ value, onChange, wines, qty=1 }){
                         const on=rackSelected(r,c);
                         const idx=multi?slotIndex(r,c):-1;
                         const taken=occ.r[r+"-"+c];
+                        const gold=hl.r[r+"-"+c];
                         const full=multi&&!on&&slots.length>=qty;
                         return (
                           <td key={c} style={{padding:1.5}}>
                             <button onClick={()=>multi?toggleSlot(r,c):setSlotSingle(r,c)} disabled={full}
                               style={{width:30,height:28,borderRadius:6,
-                                border:"1.5px solid "+(on?"#8b5e34":taken?"#8b5e3440":"var(--line2)"),
-                                background:on?"#8b5e34":taken?"#8b5e340c":"var(--card)",
-                                color:on?"#fff":taken?"#8b5e34":"transparent",opacity:full?.45:1,
+                                border:"1.5px solid "+(on?"#8b5e34":gold?"#c9962f":taken?"#8b5e3440":"var(--line2)"),
+                                background:on?"#8b5e34":gold?"#f6e4bd":taken?"#8b5e340c":"var(--card)",
+                                color:on?"#fff":gold?"#9a6f1c":taken?"#8b5e34":"transparent",opacity:full?.45:1,
+                                boxShadow:gold&&!on?"0 0 0 2px #c9962f66 inset":"none",
                                 fontSize:on&&multi?10:8,fontWeight:700,display:"grid",placeItems:"center",cursor:full?"default":"pointer"}}>
-                              {on?(multi?(idx+1):"✓"):taken?"●":""}
+                              {on?(multi?(idx+1):"✓"):gold?"●":taken?"●":""}
                             </button>
                           </td>
                         );
