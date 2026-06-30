@@ -188,6 +188,45 @@ function _slotsOf(w){
   return [];
 }
 
+// ---------- fuzzy search across the whole cellar (tolerant of typos/partial words) ----------
+function _searchWords(s){
+  return (s||"").toString().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]+/g," ")
+    .split(/\s+/).filter(Boolean);
+}
+function _editDistance1(a,b){
+  if(a===b) return true;
+  const la=a.length, lb=b.length;
+  if(Math.abs(la-lb)>1) return false;
+  if(la>lb){ const t=a; a=b; b=t; }
+  let i=0,j=0,diff=0;
+  while(i<a.length && j<b.length){
+    if(a[i]===b[j]){ i++; j++; continue; }
+    diff++;
+    if(diff>1) return false;
+    if(a.length===b.length){ i++; j++; } else { j++; }
+  }
+  if(j<b.length) diff += (b.length-j);
+  return diff<=1;
+}
+// True if a typed word is "close enough" to a wine's word: same prefix (so partial
+// typing matches as you go) or a single typo (one extra/missing/swapped letter).
+function _wordCloseEnough(typed, actual){
+  if(actual.startsWith(typed)) return true;
+  if(typed.length>=4 && _editDistance1(typed,actual)) return true;
+  return false;
+}
+// Does a wine match a free-text search query? Every typed word must be close to
+// at least one word across producer/cuvée/varietal/region/country/etc — order-
+// independent, and forgiving of small typos (e.g. "Difesse" still finds "Difese").
+function wineMatchesQuery(w, query){
+  const qWords = _searchWords(query);
+  if(!qWords.length) return true;
+  const fieldWords = _searchWords([w.producer,w.cuvee,w.varietal,w.region,w.country,w.subregion,w.classification,String(w.vintage||"")].join(" "));
+  return qWords.every(qw => fieldWords.some(fw => _wordCloseEnough(qw, fw)));
+}
+
 const Cellar = {
   all(){ return load(); },
   get(id){ return load().find(w=>w.id===id); },
@@ -527,4 +566,4 @@ All four are 4-digit years and MUST satisfy drinkFrom <= peakFrom <= peakTo <= d
   return patch;
 }
 
-Object.assign(window, { Cellar, useCellar, getCellarName, setCellarName, useCellarName, DEFAULT_CELLAR_NAME, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, peakCore, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines });
+Object.assign(window, { Cellar, useCellar, getCellarName, setCellarName, useCellarName, DEFAULT_CELLAR_NAME, statusOf, statusLabel, statusSub, statusBlurb, STATUS_LABEL, windowMarkers, peakCore, windowText, meterGeom, fmt$, COLOR_HEX, RATING_SOURCES, ratingsList, refreshRatings, refreshWindow, identifyFromText, identifyFromImage, coravinInfo, coravinText, CORAVIN_DAYS, THIS_YEAR, SCHEMA_VERSION, migrateWines, wineMatchesQuery });

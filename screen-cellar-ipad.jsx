@@ -34,10 +34,11 @@ function CellarScreenIPad({ onOpen, selectedId, openScan, filters, setFilters })
   const byStatus = status? byVintage.filter(w=>{ const s=statusOf(w); return status==="ready" ? (s==="now"||s==="soon") : s===status; }) : byVintage;
   const byStorage = storage? byStatus.filter(w=>w.location&&w.location.area===storage) : byStatus;
   const byReviewer = reviewer? byStorage.filter(w=>w.ratings&&w.ratings[reviewer]!=null&&w.ratings[reviewer]>0) : byStorage;
-  const ql = q.trim().toLowerCase();
+  const ql = q.trim();
   // A search query searches the WHOLE cellar — it overrides any active facet/drill
-  // filters (which persist across tabs), so a scanned/known wine always turns up.
-  const filtered = (ql? base.filter(w=>[w.producer,w.cuvee,w.varietal,w.region,w.country,w.subregion,w.classification,String(w.vintage)].join(" ").toLowerCase().includes(ql)) : byReviewer)
+  // filters (which persist across tabs) — and tolerates small typos/partial words,
+  // so a scanned/known wine always turns up.
+  const filtered = (ql? base.filter(w=>wineMatchesQuery(w, ql)) : byReviewer)
     .slice().sort(SORTS[sort].fn);
 
   const totalBottles = filtered.reduce((s,w)=>s+(w.qty||1),0);
