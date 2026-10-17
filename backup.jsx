@@ -3,7 +3,8 @@
 const BK_SCAN_COUNT = "storavin_scans_since_bk";
 const BK_LAST_LOCAL = "storavin_last_bk_local";
 const BK_LAST_DRIVE = "storavin_last_bk_drive";
-const BK_CLIENT_ID  = "storavin_gdrive_client_id";
+const BK_CLIENT_ID  = "storavin_gdrive_client_id"; // legacy: per-device pasted ID, now cleared on load
+const GDRIVE_CLIENT_ID = "614303542688-ltnerh04shi7s26uqi1dsp65ivk1vmqi.apps.googleusercontent.com";
 const BK_EVER_CONNECTED = "storavin_gdrive_ever_connected";
 const BK_RECONNECT_DISMISS = "storavin_reconnect_dismissed_date";
 const BK_INTERVAL   = 10; // wines scanned between auto-backups
@@ -179,13 +180,15 @@ const _ls = {
   setLastLocal:function(v){ _lsSet(BK_LAST_LOCAL,v); },
   getLastDrive:function(){ return _lsGet(BK_LAST_DRIVE,null); },
   setLastDrive:function(v){ _lsSet(BK_LAST_DRIVE,v); },
-  getClientId: function(){ return _lsGet(BK_CLIENT_ID,""); },
-  setClientId: function(v){ _lsSet(BK_CLIENT_ID,v.trim()); },
+  getClientId: function(){ return GDRIVE_CLIENT_ID; },
   getEverConnected: function(){ return _lsGet(BK_EVER_CONNECTED,"false")==="true"; },
   setEverConnected: function(v){ _lsSet(BK_EVER_CONNECTED, v?"true":"false"); },
   getReconnectDismissDate: function(){ return _lsGet(BK_RECONNECT_DISMISS, ""); },
   setReconnectDismissDate: function(v){ _lsSet(BK_RECONNECT_DISMISS, v); }
 };
+
+// Drop any Client ID pasted on this device before the built-in one existed.
+try{ localStorage.removeItem(BK_CLIENT_ID); }catch(e){}
 
 /* --- BackupManager --- */
 const _bkSubs = new Set();
@@ -224,11 +227,8 @@ const BackupManager = {
   saveLocal: function(){ this._localDownload(); },
 
   /* drive */
-  connectDrive: async function(clientId){
-    if(clientId) _ls.setClientId(clientId);
-    var id = _ls.getClientId();
-    if(!id) throw new Error("Paste your Google Client ID first.");
-    await _gSignIn(id);
+  connectDrive: async function(){
+    await _gSignIn(_ls.getClientId());
     _ls.setEverConnected(true);
     _notify();
     if(typeof SyncManager!=="undefined" && SyncManager.enabled){ SyncManager.start(); SyncManager.syncNow().catch(function(){}); }
