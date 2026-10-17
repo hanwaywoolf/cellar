@@ -9,8 +9,6 @@ function BackupScreen({ onClose }){
   const [driveList, setDriveList]   = React.useState(null);   // null=not fetched, []=fetched
   const [driveLoading, setDriveLoading] = React.useState(false);
   const [driveErr, setDriveErr]     = React.useState("");
-  const [clientInput, setClientInput] = React.useState(bk.clientId || "");
-  const [clientEditing, setClientEditing] = React.useState(!bk.clientId);
   const [status, setStatus]         = React.useState("");   // transient feedback
   const [restoreConfirm, setRestoreConfirm] = React.useState(null); // {label, fn}
   const fileRef = React.useRef(null);
@@ -34,8 +32,7 @@ function BackupScreen({ onClose }){
   async function handleConnect(){
     setDriveErr(""); setDriveLoading(true);
     try{
-      await bk.connectDrive(clientInput);
-      setClientEditing(false);
+      await bk.connectDrive();
       flash("Connected to Google Drive ✓");
       fetchDriveList();
     } catch(e){ setDriveErr(e.message); }
@@ -55,7 +52,7 @@ function BackupScreen({ onClose }){
     if(!sync.enabled){
       if(!bk.driveConnected){
         setDriveErr(""); setDriveLoading(true);
-        try{ await bk.connectDrive(clientInput); setClientEditing(false); }
+        try{ await bk.connectDrive(); }
         catch(e){ setDriveErr(e.message); setDriveLoading(false); return; }
         setDriveLoading(false);
       }
@@ -70,7 +67,7 @@ function BackupScreen({ onClose }){
     try{ await sync.syncNow(); flash("Synced ✓"); }
     catch(e){
       if(e.message==="needs_auth"){
-        try{ await bk.connectDrive(clientInput); await sync.syncNow(); flash("Synced ✓"); }
+        try{ await bk.connectDrive(); await sync.syncNow(); flash("Synced ✓"); }
         catch(e2){ setDriveErr(e2.message); }
       } else setDriveErr(e.message);
     }
@@ -193,24 +190,13 @@ function BackupScreen({ onClose }){
               )}
             </div>
 
-            {(!bk.driveConnected || clientEditing) && (
-              <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                <input
-                  value={clientInput}
-                  onChange={e=>setClientInput(e.target.value)}
-                  placeholder="Google OAuth Client ID (…apps.googleusercontent.com)"
-                  style={{width:"100%",fontSize:12.5,padding:"9px 12px",borderRadius:10,border:"1px solid var(--line2)",background:"var(--bg)",color:"var(--ink)",fontFamily:"var(--mono)",boxSizing:"border-box"}}
-                />
-                <div className="muted" style={{fontSize:11.5,lineHeight:1.5}}>
-                  Need a Client ID? Create one at <span style={{fontWeight:600,color:"var(--wine)"}}>console.cloud.google.com</span> → APIs &amp; Services → Credentials → OAuth 2.0 Client IDs. Add this page's origin as an Authorised JavaScript origin.
-                </div>
-                <button className="btn primary" style={{height:38,fontSize:13}} onClick={handleConnect} disabled={driveLoading||!clientInput.trim()}>
-                  {driveLoading ? "Connecting…" : "Connect Drive"}
-                </button>
-              </div>
+            {!bk.driveConnected && (
+              <button className="btn primary" style={{height:38,fontSize:13}} onClick={handleConnect} disabled={driveLoading}>
+                {driveLoading ? "Connecting…" : "Connect Drive"}
+              </button>
             )}
 
-            {bk.driveConnected && !clientEditing && (
+            {bk.driveConnected && (
               <button className="btn block" style={{height:40,fontSize:13}} onClick={handleDriveBackup} disabled={driveLoading}>
                 <Ico n="download" s={15}/>{ driveLoading ? "Uploading…" : "Backup to Drive now"}
               </button>
